@@ -1,5 +1,10 @@
-"""zfit-amplitude - zfit amplitude implementation"""
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# =============================================================================
+# @file   __init__.py
+# @author Albert Puig (albert.puig@cern.ch)
+# @date   26.03.2019
+# =============================================================================
+"""Amplitude analysis for zfit."""
 
-__version__ = '0.1.0'
-__author__ = 'Albert Puig <albert.puig@cern.ch>'
-__all__ = []
+# EOF

@@ -1,0 +1,15 @@
+lambda_gamma: 1.0 1
+obs:
+    particle-names:
+        gamma: 'gamma'
+        K+: 'Kplus'
+        pi-: 'piminus'
+        pi+: 'piplus'
+    component-names:
+        x: '_PX'
+        y: '_PY'
+        z: '_PZ'
+        e: '_PE'
+decays:
+    - "K(1)(1270)+ K*(892)0 1 0 S 1 0"
+    - "K(1)(1270)+ rho(770)0 1 0 S 1 1"
