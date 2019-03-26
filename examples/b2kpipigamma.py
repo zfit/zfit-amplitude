@@ -100,7 +100,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             raise ValueError("Unknown wave -> {}".format(wave))
         self.wave = wave
         dec_string = sanitize_string('{}->{}{}'.format(self.kres.name, self.vres.name, self.p1_part.name))
-        decay_tree = ('B+', None, [
+        decay_tree = ('B+', lp.B_plus.mass, [
             (self.kres.name, kres_mass(self.kres.mass, self.kres.width, dec_string), [
                 (self.vres.name, vres_mass(self.vres.mass, self.vres.width, dec_string), [
                     (self.p2_part.name, self.p2_part.mass, []),
@@ -156,7 +156,6 @@ class Bp2KpipiGamma(Decay):
     """
 
     # pylint: disable=E1101
-    TOP_PARTICLE_MASS = lp.B_plus.mass
     DEFAULT_PARTICLE_NAMES = {'gamma': 'gamma', 'K+': 'Kplus', 'pi-': 'piminus', 'pi+': 'piplus'}
     DEFAULT_COMPONENT_NAMES = {'x': '_PX', 'y': '_PY', 'z': '_PZ', 'e': '_PE'}
     DEFAULT_RANGES = {'x': (-SCALE, SCALE), 'y': (-SCALE, SCALE), 'z': (-SCALE, SCALE), 'e': (10, SCALE * 1e3)}
@@ -200,22 +199,23 @@ class Bp2KpipiGamma(Decay):
                                             for component in ('x', 'y', 'z', 'e')])
                 for particle in ('gamma', 'K+', 'pi-', 'pi+')}
 
-    def _pdf(self, name, _):
+    def _pdf(self, name):
         """Build the PDF.
 
         Sum incoherently the coherent sum of L and R, separately.
 
         """
-        right_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name="{}_R".format(name),
-                                           amp_list=[amp.amplitude(self._obs_dict, chirality="R")
+        flattened_obs = functools.reduce(operator.mul, self.obs.values())
+        right_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name="{}_R".format(name),
+                                           amp_list=[amp.amplitude(self.obs, chirality="R")
                                                      for amp in self._amplitudes],
                                            coef_list=self._coeffs,
-                                           top_particle_mass=self.TOP_PARTICLE_MASS)
-        left_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name="{}_L".format(name),
-                                          amp_list=[amp.amplitude(self._obs_dict, chirality="L")
+                                           top_particle_mass=self._amplitudes[0].top_particle_mass)
+        left_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name="{}_L".format(name),
+                                          amp_list=[amp.amplitude(self.obs, chirality="L")
                                                     for amp in self._amplitudes],
                                           coef_list=self._coeffs,
-                                          top_particle_mass=self.TOP_PARTICLE_MASS)
+                                          top_particle_mass=self._amplitudes[0].top_particle_mass)
         safe_lambda_gamma = tf.minimum(self.lambda_gamma, 1.)
         return zfit.pdf.SumPDF([right_pdf, left_pdf], [((1 + safe_lambda_gamma) / 2)], name="Sum_L_R")
 
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     decay = Bp2KpipiGamma('b2kpipigamma.yaml')
     lower = (tuple([-SCALE, -SCALE, -SCALE, 10] * 4),)  # last one is energy, only positive
     upper = (tuple([SCALE, SCALE, SCALE, SCALE] * 4),)
-    limits = zfit.Space(obs=decay.obs, limits=(lower, upper))
+    limits = zfit.Space(obs=functools.reduce(operator.mul, decay.obs.values()), limits=(lower, upper))
 
     pdf = decay.pdf("Test")
     pdf.update_integration_options(draws_per_dim=300000)

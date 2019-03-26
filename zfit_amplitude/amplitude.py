@@ -7,8 +7,6 @@
 # =============================================================================
 """Base amplitude classes."""
 
-import operator
-import functools
 from itertools import combinations
 
 import tensorflow as tf
@@ -25,14 +23,14 @@ from zfit_amplitude.utils import sanitize_string
 class Decay:
     """Representation of a high-level decay, which can be made up of several amplitudes.
 
-
     Arguments:
 
     Raise:
-        ValueError: If amplitude and coefficient list are not of the same length.
+        KeyError: If amplitude and coefficient list are not of the same length.
+        ValueError: If all the amplitudes don't have the same top particle mass.
 
     """
-    REQUIRED_ATTRIBUTES = ('TOP_PARTICLE_MASS',)
+    REQUIRED_ATTRIBUTES = tuple()
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -42,13 +40,15 @@ class Decay:
             raise NotImplementedError("Decay attributes not implemented in subclass -> {}"
                                       .format(', '.join(missing_args)))
 
-    def __init__(self, obs_dict, amplitudes, coeffs):  # noqa: W107
-        if len(amplitudes) != len(coeffs):
-            raise ValueError("Amplitude and coefficient lists must have the same length!")
-        self._amplitudes = amplitudes
-        self._coeffs = coeffs
-        self._obs_dict = obs_dict
-        self._obs = functools.reduce(operator.mul, obs_dict.values())
+    def __init__(self, obs, amplitudes=None, coeffs=None):  # noqa: W107
+        if amplitudes:
+            if len(amplitudes) != len(coeffs):
+                raise ValueError("Amplitude and coefficient lists must have the same length!")
+            if len(set(amplitude.top_particle_mass for amplitude in amplitudes)) != 1:
+                raise ValueError
+        self._amplitudes = amplitudes if amplitudes else []
+        self._coeffs = coeffs if coeffs else []
+        self._obs = obs
 
     def add_amplitude(self, amplitude, coeff):
         """Add amplitude and its correspondig coefficient.
@@ -88,10 +88,10 @@ class Decay:
     def _pdf(self, name, external_integral=None):
         return SumAmplitudeSquaredPDF(obs=self.obs,
                                       name=name,
-                                      amp_list=[amp.get_amplitude(self._obs_dict)
+                                      amp_list=[amp.get_amplitude(self._obs)
                                                 for amp in self._amplitudes],
                                       coef_list=self._coeffs,
-                                      top_particle_mass=self.TOP_PARTICLE_MASS,
+                                      top_particle_mass=self._amplitudes[0].top_particle_mass,
                                       external_integral=external_integral)
 
 
@@ -247,9 +247,15 @@ class Amplitude:
         if len(decay_tree) != 3:
             raise KeyError("Badly specified decay tree")
         self._decay_tree = decay_tree
+        self._top_mass = decay_tree[1]
 
     def __repr__(self):
         return "<Amplitude: {}>".format(self.get_decay_string())
+
+    @property
+    def top_particle_mass(self):
+        """float: Mass of the top particle of the decay."""
+        return self._top_mass
 
     def _decay_string(self):
         def get_children(tree):
@@ -279,16 +285,16 @@ class Amplitude:
             decay_str = sanitize_string(decay_str)
         return decay_str
 
-    def amplitude(self, obs_dict, **kwargs):
+    def amplitude(self, obs, **kwargs):
         """Get the full decay amplitude.
 
         Arguments:
-            obs_dict (dict): Observables grouped by particle name.
+            obs: Observables.
 
         """
-        return self._amplitude(obs_dict, **kwargs)
+        return self._amplitude(obs, **kwargs)
 
-    def _amplitude(self, obs_dict, **kwargs):
+    def _amplitude(self, obs, **kwargs):
         """Amplitude implementation.
 
         To be overridden.
