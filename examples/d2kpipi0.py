@@ -14,6 +14,7 @@ import tensorflow as tf
 import zfit
 
 from particle.particle import literals as lp
+from particle import Particle
 
 from zfit_amplitude.amplitude import Decay, Amplitude
 import zfit_amplitude.dynamics as dynamics
@@ -27,10 +28,18 @@ D_ZERO = lp.D_0
 
 
 RESONANCES = {'rho(770)': ('m2pipi', lp.rho_770_plus),
-              'K*(892)+': ('m2kpiz', lp.Kst_892_plus)}
+              'K2*(1430)0': ('m2kpim', Particle.from_string('K(2)*(1430)')),
+              'K0*(1430)+': ('m2kpiz', lp.K_0st_1430_plus),
+              'K*(892)+': ('m2kpiz', lp.Kst_892_plus),
+              'K0*(1430)0': ('m2kpim', lp.K_0st_1430_0),
+              'K*(892)0': ('m2kpim', lp.Kst_892_0)}
 
 COEFFS = {'rho(770)': zfit.ComplexParameter.from_polar('f(rho(770))', 1.0, 0.0, floating=False),
-          'K*(892)+': zfit.ComplexParameter.from_polar('f(Kstar(892))', 0.398, radians(24.1))}
+          'K2*(1430)0': zfit.ComplexParameter.from_polar('f(K2star(1430)0)', 0.088, radians(-17.2)),
+          'K0*(1430)+': zfit.ComplexParameter.from_polar('f(K0star(1430)plus)', 6.78, radians(69.1)),
+          'K*(892)+': zfit.ComplexParameter.from_polar('f(Kstar(892)plus)', 0.899, radians(-171)),
+          'K0*(1430)0': zfit.ComplexParameter.from_polar('f(K0star(1430)0)', 1.65 , radians(-44.4)),
+          'K*(892)0': zfit.ComplexParameter.from_polar('f(Kstar(892)0)', 0.398, radians(24.1))}
 
 
 def resonance_mass(mass, width, name):
