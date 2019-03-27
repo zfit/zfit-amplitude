@@ -7,7 +7,11 @@
 # =============================================================================
 """Base amplitude classes."""
 
+from collections import OrderedDict
+from types import MethodType
+
 from itertools import combinations
+import functools
 
 import tensorflow as tf
 import zfit
@@ -40,7 +44,7 @@ class Decay:
             raise NotImplementedError("Decay attributes not implemented in subclass -> {}"
                                       .format(', '.join(missing_args)))
 
-    def __init__(self, obs, amplitudes=None, coeffs=None):  # noqa: W107
+    def __init__(self, final_state_particles, obs, amplitudes=None, coeffs=None, sampling_function=None, variable_transformations=None):  # noqa: W107
         if amplitudes:
             if len(amplitudes) != len(coeffs):
                 raise ValueError("Amplitude and coefficient lists must have the same length!")
@@ -49,6 +53,24 @@ class Decay:
         self._amplitudes = amplitudes if amplitudes else []
         self._coeffs = coeffs if coeffs else []
         self._obs = obs
+        self._internal_obs = self._build_obs(final_state_particles)
+        # Do some checks for the sampling and variable transforms
+        if not sampling_function:  # We do phasespace sampling
+            if not variable_transformations:  # We need to have 4-momenta as obs!
+                if len(obs.obs) < 8 or len(obs.obs) % 4:
+                    raise KeyError("Requested sampling in phasespace but it doesn't seem like observables are 4-momenta")
+        if variable_transformations:
+            if set(variable_transformations.keys()) != set(obs.obs):
+                raise KeyError("Variable transformations don't match observables")
+        self._sampling_function = sampling_function
+        self._var_transforms = variable_transformations
+
+    @staticmethod
+    def _build_obs(particles):
+        return OrderedDict((particle, functools.reduce(operator.mul,
+                                           [zfit.Space(obs=f"{particle}_{component}")  # No limits are set
+                                            for component in ('x', 'y', 'z', 'e')]))
+                for particle in particles)
 
     def add_amplitude(self, amplitude, coeff):
         """Add amplitude and its correspondig coefficient.
@@ -86,13 +108,20 @@ class Decay:
         return self._pdf(name)
 
     def _pdf(self, name, external_integral=None):
-        return SumAmplitudeSquaredPDF(obs=self.obs,
-                                      name=name,
-                                      amp_list=[amp.amplitude(self._obs)
-                                                for amp in self._amplitudes],
-                                      coef_list=self._coeffs,
-                                      top_particle_mass=self._amplitudes[0].top_particle_mass,
-                                      external_integral=external_integral)
+        pdf = SumAmplitudeSquaredPDF(obs=self.obs,
+                                     name=name,
+                                     amp_list=[amp.amplitude(self._obs)
+                                               for amp in self._amplitudes],
+                                     coef_list=self._coeffs,
+                                     top_particle_mass=self._amplitudes[0].top_particle_mass,
+                                     external_integral=external_integral)
+        if self._sampling_function:
+            pdf._do_sample = MethodType(self._sampling_function, pdf)
+        if self._var_transforms:
+            def transform_sampling(slf, gen_particles):
+                return {var: func(gen_particles) for var, func in self._var_transforms}
+            pdf._do_transform = MethodType(transform_sampling, pdf)
+        return pdf
 
 
 class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
@@ -118,7 +147,6 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                                          for (amp1, frac1), (amp2, frac2)
                                          in combinations(list(zip(amp_list, coef_list)), 2)]
         self._amplitudes = list(zip(coef_list, amp_list))
-        self._particles = None
         self._top_at_rest = tf.stack((0.0, 0.0, 0.0, top_particle_mass), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
         self.update_integration_options(draws_per_dim=300000)
@@ -136,12 +164,13 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
 
     @zfit.supports()
     def _sample_and_weights(self, n_to_produce, limits, dtype):
-        def flatten_gen(gen_list):
-            if not self._particles:
-                self._particles = gen_list.keys()
-            return tf.concat([gen_list[part] for part in self._particles],
-                             axis=1)
+        gen_parts, *output = self._do_sample(n_to_produce, limits)
+        gen_parts = self._do_transform(gen_parts)
+        gen_parts = tf.concat([self._do_transform(gen_parts)[obs]
+                               for obs in self._obs.obs], axis=1)
+        return tuple([gen_parts] + output)
 
+    def _do_sample(self, n_to_produce, limits):
         pseudo_yields = []
         generators = []
         for frac, amp in self._amplitudes:
@@ -152,15 +181,28 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                          for pseudo_yield in pseudo_yields]
 
         norm_weights = []
-        particles = []
+        particles = {}
         for amp_num, (_, amp) in enumerate(self._amplitudes):
             norm_weight, parts = generators[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
             norm_weights.append(norm_weight)
-            particles.append(flatten_gen(parts))
-        merged_particles = tf.concat(particles, axis=0)
+            for part_name, gen_parts in parts.items():
+                if part_name not in particles:
+                    particles[part_name] = []
+                particles[part_name].append(gen_parts)
+                merged_particles = {part_name: tf.concat(particles, axis=0)
+                                    for part_name, part_list in particles}
         merged_weights = tf.concat(norm_weights, axis=0)
         thresholds = tf.random_uniform(shape=(n_to_produce,))
-        return merged_particles, thresholds, merged_weights, sum_yields * 0.8, len(merged_weights)
+        return merged_particles, thresholds, merged_weights, sum_yields, len(merged_weights)
+
+    def _do_transform(self, particle_dict):
+        """Identity.
+
+        In general, get a dictionary of particles as (4, n) tensors and transform it to
+        a dictionary of observables.
+
+        """
+        return particle_dict
 
     @zfit.supports()
     def _integrate(self, limits, norm_range):
