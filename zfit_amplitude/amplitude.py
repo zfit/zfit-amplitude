@@ -88,7 +88,7 @@ class Decay:
     def _pdf(self, name, external_integral=None):
         return SumAmplitudeSquaredPDF(obs=self.obs,
                                       name=name,
-                                      amp_list=[amp.get_amplitude(self._obs)
+                                      amp_list=[amp.amplitude(self._obs)
                                                 for amp in self._amplitudes],
                                       coef_list=self._coeffs,
                                       top_particle_mass=self._amplitudes[0].top_particle_mass,
