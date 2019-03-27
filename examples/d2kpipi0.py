@@ -29,8 +29,8 @@ D_ZERO = lp.D_0
 
 RESONANCES = {'rho(770)': ('m2pipi', lp.rho_770_plus),
               'K2*(1430)0': ('m2kpim', Particle.from_string('K(2)*(1430)')),
-              'K0*(1430)+': ('m2kpiz', lp.K_0st_1430_plus),
-              'K*(892)+': ('m2kpiz', lp.Kst_892_plus),
+              'K0*(1430)+': ('m2kpi0', lp.K_0st_1430_plus),
+              'K*(892)+': ('m2kpi0', lp.Kst_892_plus),
               'K0*(1430)0': ('m2kpim', lp.K_0st_1430_0),
               'K*(892)0': ('m2kpim', lp.Kst_892_0)}
 
@@ -61,7 +61,7 @@ class D2Kpipi0Amplitude(Amplitude):
                 (self.resonance.name, res_mass, [
                     ('pi-', PI_MINUS.mass, []), ('pi0', PI_ZERO.mass, [])]),
                 ('K+', K_PLUS.mass, [])])
-        elif self.mass_var == 'm2kpi-':
+        elif self.mass_var == 'm2kpim':
             decay_tree = ('D0', D_ZERO.mass, [
                 (self.resonance.name, res_mass, [
                     ('K-', K_PLUS.mass, []),
@@ -76,6 +76,7 @@ class D2Kpipi0Amplitude(Amplitude):
         super().__init__(decay_tree)
 
     def _amplitude(self, obs):
+        print(self.mass_var)
         mass_obs = obs.get_subspace(self.mass_var)
         return dynamics.RelativisticBreitWigner(obs=mass_obs,
                                                 name=self.resonance.name,
@@ -85,9 +86,7 @@ class D2Kpipi0Amplitude(Amplitude):
 
 
 if __name__ == "__main__":
-    print("This does currently not run")
-
-    m2kpim = zfit.Space(obs='m2kpi-',
+    m2kpim = zfit.Space(obs='m2kpim',
                         limits=((K_PLUS.mass + PI_MINUS.mass)**2, (D_ZERO.mass - PI_ZERO.mass)**2))
     m2kpiz = zfit.Space(obs='m2kpi0',
                         limits=((K_PLUS.mass + PI_ZERO.mass)**2, (D_ZERO.mass - PI_MINUS.mass)**2))
