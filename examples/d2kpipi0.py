@@ -76,8 +76,8 @@ class D2Kpipi0Amplitude(Amplitude):
         super().__init__(decay_tree)
 
     def _amplitude(self, obs):
-        obs = obs.get_subspace(self.mass_var)
-        return dynamics.RelativisticBreitWigner(obs=obs,
+        mass_obs = obs.get_subspace(self.mass_var)
+        return dynamics.RelativisticBreitWigner(obs=mass_obs,
                                                 name=self.resonance.name,
                                                 mres=self.resonance.mass,
                                                 wres=self.resonance.width,
@@ -85,6 +85,8 @@ class D2Kpipi0Amplitude(Amplitude):
 
 
 if __name__ == "__main__":
+    print("This does currently not run")
+
     m2kpim = zfit.Space(obs='m2kpi-',
                         limits=((K_PLUS.mass + PI_MINUS.mass)**2, (D_ZERO.mass - PI_ZERO.mass)**2))
     m2kpiz = zfit.Space(obs='m2kpi0',
@@ -98,5 +100,8 @@ if __name__ == "__main__":
     for res in RESONANCES:
         D2Kpipi0.add_amplitude(D2Kpipi0Amplitude(res),
                                COEFFS[res])
+    pdf = D2Kpipi0.pdf("D2Kpipi0")
+    for dep in pdf.get_dependents(only_floating=False):
+        print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
 # EOF
