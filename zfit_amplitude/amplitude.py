@@ -34,17 +34,7 @@ class Decay:
         ValueError: If all the amplitudes don't have the same top particle mass.
 
     """
-    REQUIRED_ATTRIBUTES = tuple()
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        missing_args = [attr for attr in Decay.REQUIRED_ATTRIBUTES
-                        if not hasattr(cls, attr)]
-        if missing_args:
-            raise NotImplementedError("Decay attributes not implemented in subclass -> {}"
-                                      .format(', '.join(missing_args)))
-
-    def __init__(self, final_state_particles, obs, amplitudes=None, coeffs=None, sampling_function=None, variable_transformations=None):  # noqa: W107
+    def __init__(self, obs, amplitudes=None, coeffs=None, sampling_function=None, variable_transformations=None):  # noqa: W107
         if amplitudes:
             if len(amplitudes) != len(coeffs):
                 raise ValueError("Amplitude and coefficient lists must have the same length!")
@@ -53,7 +43,6 @@ class Decay:
         self._amplitudes = amplitudes if amplitudes else []
         self._coeffs = coeffs if coeffs else []
         self._obs = obs
-        self._internal_obs = self._build_obs(final_state_particles)
         # Do some checks for the sampling and variable transforms
         if not sampling_function:  # We do phasespace sampling
             if not variable_transformations:  # We need to have 4-momenta as obs!
@@ -64,13 +53,6 @@ class Decay:
                 raise KeyError("Variable transformations don't match observables")
         self._sampling_function = sampling_function
         self._var_transforms = variable_transformations
-
-    @staticmethod
-    def _build_obs(particles):
-        return OrderedDict((particle, functools.reduce(operator.mul,
-                                           [zfit.Space(obs=f"{particle}_{component}")  # No limits are set
-                                            for component in ('x', 'y', 'z', 'e')]))
-                for particle in particles)
 
     def add_amplitude(self, amplitude, coeff):
         """Add amplitude and its correspondig coefficient.
@@ -83,7 +65,25 @@ class Decay:
         Return:
             int: Total number of configured amplitudes.
 
+        Raise:
+            ValueError: If the given amplitude is not compatible with previous ones due to
+                a different final state.
+
         """
+        def get_final_state_particles(amp):
+            def recurse(leaves):
+                parts = []
+                for part, _, children in leaves:
+                    if not children:
+                        parts.append(part)
+                    else:
+                        parts.extend(recurse(children))
+                return parts
+            return amp.decay_tree[2]
+
+        if self._amplitudes:
+            if set(get_final_state_particles(self._amplitudes[-1])) != set(get_final_state_particles(amplitude)):
+                raise ValueError("Incompatible Amplitude -> final state particles don't match")
         self._amplitudes.append(amplitude)
         self._coeffs.append(coeff)
         return len(self._amplitudes)
@@ -118,7 +118,7 @@ class Decay:
         if self._sampling_function:
             pdf._do_sample = MethodType(self._sampling_function, pdf)
         if self._var_transforms:
-            def transform_sampling(slf, gen_particles):
+            def transform_sampling(_, gen_particles):
                 return {var: func(gen_particles) for var, func in self._var_transforms}
             pdf._do_transform = MethodType(transform_sampling, pdf)
         return pdf
@@ -166,7 +166,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     def _sample_and_weights(self, n_to_produce, limits, dtype):
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         gen_parts = self._do_transform(gen_parts)
-        gen_parts = tf.concat([self._do_transform(gen_parts)[obs]
+        gen_parts = tf.concat([gen_parts[obs]
                                for obs in self._obs.obs], axis=1)
         return tuple([gen_parts] + output)
 
@@ -293,6 +293,11 @@ class Amplitude:
 
     def __repr__(self):
         return "<Amplitude: {}>".format(self.get_decay_string())
+
+    @property
+    def decay_tree(self):
+        """tuple: Decay tree."""
+        return self._decay_tree
 
     @property
     def top_particle_mass(self):
