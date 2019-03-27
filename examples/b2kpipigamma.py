@@ -88,12 +88,12 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             self.p1_part = lp.K_plus
             self.p2_part = lp.pi_plus
             self.p3_part = lp.pi_minus
-            self.particle_order = ('K+', 'pi+', 'pi-')
+            self.particle_order = ('K+', 'pi+', 'pi-', 'gamma')
         elif self.vres in V2KPI:
             self.p1_part = lp.pi_plus
             self.p2_part = lp.K_plus
             self.p3_part = lp.pi_minus
-            self.particle_order = ('pi+', 'K+', 'pi-')
+            self.particle_order = ('pi+', 'K+', 'pi-', 'gamma')
         else:
             raise ValueError("Vres not implemented! -> {}".format(self.vres.fullname))
         if wave not in WAVES:
@@ -113,17 +113,17 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         """Get the full decay amplitude."""
         all_vectors_obs = functools.reduce(operator.mul,
                                            [obs_dict[particle_name]
-                                            for particle_name in self.particle_order + ('gamma',)])
+                                            for particle_name in self.particle_order])
         helicity = +1 if chirality == 'R' else -1
         sf = dynamics.SpinFactor(all_vectors_obs, "1+", self.wave, helicity, self.kres.mass, self.vres.mass)
         kres_obs = functools.reduce(operator.mul,
                                     [obs_dict[particle_name]
-                                     for particle_name in self.particle_order])
+                                     for particle_name in self.particle_order[:-1]])
         kres_bw = dynamics.RelativisticBreitWigner(obs=kres_obs, name="Kres_BW", mres=self.kres.mass,
                                                    wres=self.kres.width)
         vres_obs = functools.reduce(operator.mul,
                                     [obs_dict[particle_name]
-                                     for particle_name in self.particle_order[1:]])
+                                     for particle_name in self.particle_order[1:-1]])
         vres_bw = dynamics.RelativisticBreitWigner(obs=vres_obs, name="Vres_BW", mres=self.vres.mass,
                                                    wres=self.vres.width)
         return sf * kres_bw * vres_bw
@@ -197,7 +197,7 @@ class Bp2KpipiGamma(Decay):
                                            [zfit.Space(obs=particle_names[particle] + comp_names[component],
                                                        limits=Bp2KpipiGamma.DEFAULT_RANGES[component])
                                             for component in ('x', 'y', 'z', 'e')])
-                for particle in ('gamma', 'K+', 'pi-', 'pi+')}
+                for particle in ('K+', 'pi-', 'pi+', 'gamma')}
 
     def _pdf(self, name):
         """Build the PDF.
