@@ -48,18 +48,26 @@ def relativistic_breit_wigner(m2, mres, wres):
 
 # relativistic_breit_wigner = make_func(func=relativistic_breit_wigner, params=['mres', 'wres'])
 
-class RelativisticBreitWigner(zfit.func.ZFunc):
-    _PARAMS = ['mres', 'wres']
+class RelativisticBreitWigner(zfit.func.BaseFunc):
+    def __init__(self, obs, name, mres, wres, using_m_squared=False):
+        self.using_m_squared = using_m_squared
+        super().__init__(obs=obs, name=name, dtype=zfit.settings.ztypes.complex,
+                         params={'mres': mres, 'wres': mres})
 
     def _func(self, x):
-        m2 = ztf.unstack_x(x)
-        if isinstance(m2, list):
-            m2 = kinematics.mass(tf.reduce_sum([kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
-                                                for px, py, pz, pe in zip(*[iter(m2)] * 4)],
-                                               axis=0))
+        var = ztf.unstack_x(x)
+        if isinstance(var, list):
+            m_sq = kinematics.mass_squared(tf.reduce_sum(
+                [kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
+                 for px, py, pz, pe in zip(*[iter(var)] * 4)],
+                axis=0))
+        elif self.using_m_squared:
+            m_sq = var
+        else:
+            m_sq = tf.pow(var, 2)
         mres = self.params['mres']
         wres = self.params['wres']
-        return relativistic_breit_wigner(m2, mres, wres)
+        return relativistic_breit_wigner(m_sq, mres, wres)
 
 
 def blatt_weisskopf_ff(q, q0, d, l):
@@ -127,19 +135,25 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
     """Func version of `breit_wigner_line_shape`."""
 
     def __init__(self, obs, name,
-                 m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld, ma0, md0, barrier_factor):
+                 m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld, ma0, md0, barrier_factor, using_m_squared=False):
         self.barrier_factor = barrier_factor
+        self.using_m_squared = using_m_squared
         super().__init__(obs=obs, name=name, dtype=zfit.settings.ztypes.complex,
                          params={'m0': m0, 'gamma0': gamma0, 'ma': ma, 'mb': mb, 'mc': mc, 'md': md,
                                  'dr': dr, 'dd': dd, 'lr': lr, 'ld': ld, 'ma0': ma0, 'md0': md0})
 
     def _func(self, x):
         def func(x):
-            m2 = ztf.unstack_x(x)
-            if isinstance(m2, list):
-                m2 = kinematics.mass(tf.reduce_sum([kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
-                                                    for px, py, pz, pe in zip(*[iter(m2)] * 4)],
-                                                   axis=0))
+            var = ztf.unstack_x(x)
+            if isinstance(var, list):
+                m_sq = kinematics.mass(tf.reduce_sum(
+                    [kinematics.lorentz_vector(kinematics.vector(px, py, pz), pe)
+                     for px, py, pz, pe in zip(*[iter(var)] * 4)],
+                    axis=0))
+            elif self.using_m_squared:
+                m_sq = var
+            else:
+                m_sq = tf.pow(var, 2)
             m0 = self.params['m0']
             gamma0 = self.params['gamma0']
             ma = self.params['ma']
@@ -152,7 +166,7 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
             ld = self.params['ld']
             ma0 = self.params['ma0']
             md0 = self.params['md0']
-            return breit_wigner_line_shape(m2, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld,
+            return breit_wigner_line_shape(m_sq, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld,
                                            self.barrier_factor, ma0, md0)
         return ztf.run_no_nan(func=func, x=x)
 

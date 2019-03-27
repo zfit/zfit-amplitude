@@ -9,6 +9,8 @@
 
 from math import radians
 
+import tensorflow as tf
+
 import zfit
 
 from particle.particle import literals as lp
@@ -31,24 +33,34 @@ COEFFS = {'rho(770)': zfit.ComplexParameter.from_polar('f(rho(770))', 1.0, 0.0, 
           'K*(892)+': zfit.ComplexParameter.from_polar('f(Kstar(892))', 0.398, radians(24.1))}
 
 
+def resonance_mass(mass, width, name):
+    def get_resonance_mass(mass_min, mass_max, n_events):
+        bw = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'M({name})',
+                                                             mass_min, mass_max),
+                                              name=f'BW({name})',
+                                              mres=mass, wres=width).sample(n_events)
+        return tf.reshape(bw, (1, n_events))
+    return get_resonance_mass
+
+
 class D2Kpipi0Amplitude(Amplitude):
     def __init__(self, resonance):
         self.mass_var, self.resonance = RESONANCES[resonance]
+        res_mass = resonance_mass(self.resonance.mass, self.resonance.width, self.resonance.name)
         if self.mass_var == 'm2pipi':
             decay_tree = ('D0', D_ZERO.mass, [
-                (self.resonance.name, self.resonance.mass, [
-                    ('pi-', PI_MINUS.mass, []),
-                    ('pi0', PI_ZERO.mass, [])]),
+                (self.resonance.name, res_mass, [
+                    ('pi-', PI_MINUS.mass, []), ('pi0', PI_ZERO.mass, [])]),
                 ('K+', K_PLUS.mass, [])])
         elif self.mass_var == 'm2kpi-':
             decay_tree = ('D0', D_ZERO.mass, [
-                (self.resonance.name, self.resonance.mass, [
+                (self.resonance.name, res_mass, [
                     ('K-', K_PLUS.mass, []),
                     ('pi0', PI_ZERO.mass, [])]),
                 ('pi-', PI_MINUS.mass, [])])
         else:
             decay_tree = ('D0', D_ZERO.mass, [
-                (self.resonance.name, self.resonance.mass, [
+                (self.resonance.name, res_mass, [
                     ('K-', K_PLUS.mass, []),
                     ('pi-', PI_MINUS.mass, [])]),
                 ('pi0', PI_ZERO.mass, [])])
@@ -59,7 +71,8 @@ class D2Kpipi0Amplitude(Amplitude):
         return dynamics.RelativisticBreitWigner(obs=obs,
                                                 name=self.resonance.name,
                                                 mres=self.resonance.mass,
-                                                wres=self.resonance.width)
+                                                wres=self.resonance.width,
+                                                using_m_squared=True)
 
 
 if __name__ == "__main__":

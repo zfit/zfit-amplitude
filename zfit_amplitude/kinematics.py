@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+in/env python3
 # -*- coding: utf-8 -*-
 # =============================================================================
 # @file   kinematics.py
@@ -107,12 +107,17 @@ def scalar(x):
     return tf.stack([x], axis=1)
 
 
+def mass_squared(vector):
+    """Calculate the squared mass for a Lorentz 4-momentum."""
+    return tf.reduce_sum(tf.transpose(vector * vector) * tf.reshape(metric_tensor(), (4,1)), axis=0)
+
+
 def mass(vector):
     """
     Calculate mass scalar for Lorentz 4-momentum
         vector : input Lorentz momentum vector
     """
-    return tf.sqrt(tf.reduce_sum(tf.transpose(vector * vector) * tf.reshape(metric_tensor(), (4,1)), axis=0))
+    return tf.sqrt(mass_squared(vector))
     # return tf.sqrt(tf.reduce_sum(vector * vector * metric_tensor(), axis=1))
 
 
