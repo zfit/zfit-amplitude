@@ -40,9 +40,9 @@ V2KPI = (lp.Kst_892_0, lp.K_0st_1430_0, Particle.from_pdgid(225))
 # Mass functions
 def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
-        bw_res = dynamics.RelativisticBreitWigner(obs=zfit.Space('Kres_mass({})'.format(dec_string),
+        bw_res = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'Kres_mass({dec_string})',
                                                                  mass_min, mass_max),
-                                                  name='Kres_BW({})'.format(dec_string),
+                                                  name=f'Kres_BW({dec_string})',
                                                   mres=kres_mass, wres=kres_width).sample(n_events)
         return tf.reshape(bw_res, 1, n_events)
     return get_kres_mass
@@ -50,9 +50,9 @@ def kres_mass(kres_mass, kres_width, dec_string):
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
-        bw_v = dynamics.RelativisticBreitWigner(obs=zfit.Space('Vres_mass({})'.format(dec_string),
+        bw_v = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'Vres_mass({dec_string})',
                                                                mass_min, mass_max),
-                                                name='Vres_BW({})'.format(dec_string),
+                                                name=f'Vres_BW({dec_string})',
                                                 mres=vres_mass, wres=vres_width).sample(n_events)
         return tf.reshape(bw_v, (1, n_events))
     return get_vres_mass
@@ -69,7 +69,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         """
         kres_list = Particle.from_string_list(name=kres)
         if not kres_list:
-            raise ValueError("Badly specified Kres -> {}".format(kres))
+            raise ValueError(f"Badly specified Kres -> {kres}")
         elif len(kres_list) > 1:
             raise ValueError("Ambiguous Kres specification -> {} (options: {})"
                              .format(kres, ','.join(res.fullname for res in kres_list)))
@@ -77,7 +77,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             self.kres = kres_list[0]
         vres_list = Particle.from_string_list(name=vres)
         if not vres_list:
-            raise ValueError("Badly specified Vres -> {}".format(vres))
+            raise ValueError(f"Badly specified Vres -> {vres}")
         elif len(vres_list) > 1:
             raise ValueError("Ambiguous vres specification -> {} (options: {})"
                              .format(vres, ','.join(res.fullname for res in vres_list)))
@@ -95,11 +95,11 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             self.p3_part = lp.pi_minus
             self.particle_order = ('pi+', 'K+', 'pi-', 'gamma')
         else:
-            raise ValueError("Vres not implemented! -> {}".format(self.vres.fullname))
+            raise ValueError(f"Vres not implemented! -> {self.vres.fullname}")
         if wave not in WAVES:
-            raise ValueError("Unknown wave -> {}".format(wave))
+            raise ValueError(f"Unknown wave -> {wave}")
         self.wave = wave
-        dec_string = sanitize_string('{}->{}{}'.format(self.kres.name, self.vres.name, self.p1_part.name))
+        dec_string = sanitize_string('{self.kres.name}->{self.vres.name}{self.p1_part.name}')
         decay_tree = ('B+', lp.B_plus.mass, [
             (self.kres.name, kres_mass(self.kres.mass, self.kres.width, dec_string), [
                 (self.vres.name, vres_mass(self.vres.mass, self.vres.width, dec_string), [
@@ -134,14 +134,14 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         Optionally, sanitize to conform to tensorflow variable names.
 
         """
-        wave_str = "" if self.wave == 'S' else '[{}]'.format(self.wave)
+        wave_str = "" if self.wave == 'S' else f'[{self.wave}]'
         decay_str = super()._decay_string()
         if wave_str:
             decay_str += wave_str
         return decay_str
 
 
-SCALE = 5e4
+SCALE = 1e4
 
 
 class Bp2KpipiGamma(Decay):
@@ -178,11 +178,12 @@ class Bp2KpipiGamma(Decay):
             wave = amp_sp[4] if len(amp_sp) > 4 else "S"
             float_a, float_phi = map(bool, map(int, amp_sp[5:7])) if len(amp_sp) > 5 else (True, True)
             amplitude = B2KP1P2P3GammaAmplitude(kres, vres, wave)
-            a_i = Parameter(name="a_{}".format(amplitude.get_decay_string(True)),
+            dec_string = amplitude.get_decay_string(True)
+            a_i = Parameter(name=f"a_{dec_string}",
                             value=float(f_a), floating=float_a)
-            phi_i = Parameter(name="phi_{}".format(amplitude.get_decay_string(True)),
+            phi_i = Parameter(name=f"phi_{dec_string}",
                               value=float(f_phi), floating=float_phi)
-            fraction = ComplexParameter.from_polar(name="f_{}".format(amplitude.get_decay_string(True)),
+            fraction = ComplexParameter.from_polar(name=f"f_{dec_string}",
                                                    mod=a_i, arg=phi_i)
             amplitudes.append(amplitude)
             coeffs.append(fraction)
@@ -206,12 +207,12 @@ class Bp2KpipiGamma(Decay):
 
         """
         flattened_obs = functools.reduce(operator.mul, self.obs.values())
-        right_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name="{}_R".format(name),
+        right_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name=f"{name}_R",
                                            amp_list=[amp.amplitude(self.obs, chirality="R")
                                                      for amp in self._amplitudes],
                                            coef_list=self._coeffs,
                                            top_particle_mass=self._amplitudes[0].top_particle_mass)
-        left_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name="{}_L".format(name),
+        left_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name=f"{name}_L",
                                           amp_list=[amp.amplitude(self.obs, chirality="L")
                                                     for amp in self._amplitudes],
                                           coef_list=self._coeffs,
