@@ -11,13 +11,14 @@ from math import radians
 
 import tensorflow as tf
 
-import zfit
-
 from particle.particle import literals as lp
 from particle import Particle
 
+import zfit
+
 from zfit_amplitude.amplitude import Decay, Amplitude
 import zfit_amplitude.dynamics as dynamics
+import zfit_amplitude.kinematics as kinematics
 
 
 # pylint: disable=E1101
@@ -38,11 +39,12 @@ COEFFS = {'rho(770)': zfit.ComplexParameter.from_polar('f(rho(770))', 1.0, 0.0, 
           'K2*(1430)0': zfit.ComplexParameter.from_polar('f(K2star(1430)0)', 0.088, radians(-17.2)),
           'K0*(1430)+': zfit.ComplexParameter.from_polar('f(K0star(1430)plus)', 6.78, radians(69.1)),
           'K*(892)+': zfit.ComplexParameter.from_polar('f(Kstar(892)plus)', 0.899, radians(-171)),
-          'K0*(1430)0': zfit.ComplexParameter.from_polar('f(K0star(1430)0)', 1.65 , radians(-44.4)),
+          'K0*(1430)0': zfit.ComplexParameter.from_polar('f(K0star(1430)0)', 1.65, radians(-44.4)),
           'K*(892)0': zfit.ComplexParameter.from_polar('f(Kstar(892)0)', 0.398, radians(24.1))}
 
 
 def resonance_mass(mass, width, name):
+    """Calculate resonance mass."""
     def get_resonance_mass(mass_min, mass_max, n_events):
         bw = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'M({name})',
                                                              mass_min, mass_max),
@@ -53,7 +55,18 @@ def resonance_mass(mass, width, name):
 
 
 class D2Kpipi0Amplitude(Amplitude):
-    def __init__(self, resonance):
+    """D -> K+pi-pi0 amplitude.
+
+    Chooses the correct observable to use and implements a BW to represent the given
+    resonance.
+
+    Arguments:
+        resonance (str): Name of the intermediate resonance. It is used to determine
+        the structure of the decay.
+
+    """
+
+    def __init__(self, resonance):  # noqa
         self.mass_var, self.resonance = RESONANCES[resonance]
         res_mass = resonance_mass(self.resonance.mass, self.resonance.width, self.resonance.name)
         if self.mass_var == 'm2pipi':
@@ -76,13 +89,19 @@ class D2Kpipi0Amplitude(Amplitude):
         super().__init__(decay_tree)
 
     def _amplitude(self, obs):
-        print(self.mass_var)
         mass_obs = obs.get_subspace(self.mass_var)
         return dynamics.RelativisticBreitWigner(obs=mass_obs,
                                                 name=self.resonance.name,
                                                 mres=self.resonance.mass,
                                                 wres=self.resonance.width,
                                                 using_m_squared=True)
+
+
+def var_transformation(particles):
+    """Transform particles to our observables of interest."""
+    return {'m2kpim': kinematics.mass_squared(particles['K+']+particles['pi-']),
+            'm2kpi0': kinematics.mass_squared(particles['K+']+particles['pi0']),
+            'm2pipi': kinematics.mass_squared(particles['pi-']+particles['pi-'])}
 
 
 if __name__ == "__main__":
@@ -93,9 +112,9 @@ if __name__ == "__main__":
     m2kpipi = zfit.Space(obs='m2pipi',
                          limits=((PI_ZERO.mass + PI_MINUS.mass)**2, (D_ZERO.mass - K_PLUS.mass)**2))
 
-    obs = m2kpim * m2kpiz * m2kpipi
+    masses = m2kpim * m2kpiz * m2kpipi
 
-    D2Kpipi0 = Decay(obs)
+    D2Kpipi0 = Decay(masses, variable_transformations=var_transformation)
     for res in RESONANCES:
         D2Kpipi0.add_amplitude(D2Kpipi0Amplitude(res),
                                COEFFS[res])

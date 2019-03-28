@@ -30,8 +30,9 @@ class Decay:
     Arguments:
 
     Raise:
-        KeyError: If amplitude and coefficient list are not of the same length.
-        ValueError: If all the amplitudes don't have the same top particle mass.
+        ValueError: If the given amplitudes and coefficients are not well defined.
+        KeyError: If the sampling and variable transformation functions lead to an inconsistent
+        configuration.
 
     """
     def __init__(self, obs, amplitudes=None, coeffs=None, sampling_function=None, variable_transformations=None):  # noqa: W107
@@ -39,7 +40,7 @@ class Decay:
             if len(amplitudes) != len(coeffs):
                 raise ValueError("Amplitude and coefficient lists must have the same length!")
             if len(set(amplitude.top_particle_mass for amplitude in amplitudes)) != 1:
-                raise ValueError
+                raise ValueError("The amplitudes have different top particle mass")
         self._amplitudes = amplitudes if amplitudes else []
         self._coeffs = coeffs if coeffs else []
         self._obs = obs
@@ -48,9 +49,6 @@ class Decay:
             if not variable_transformations:  # We need to have 4-momenta as obs!
                 if len(obs.obs) < 8 or len(obs.obs) % 4:
                     raise KeyError("Requested sampling in phasespace but it doesn't seem like observables are 4-momenta")
-        if variable_transformations:
-            if set(variable_transformations.keys()) != set(obs.obs):
-                raise KeyError("Variable transformations don't match observables")
         self._sampling_function = sampling_function
         self._var_transforms = variable_transformations
 
@@ -118,9 +116,7 @@ class Decay:
         if self._sampling_function:
             pdf._do_sample = MethodType(self._sampling_function, pdf)
         if self._var_transforms:
-            def transform_sampling(_, gen_particles):
-                return {var: func(gen_particles) for var, func in self._var_transforms}
-            pdf._do_transform = MethodType(transform_sampling, pdf)
+            pdf._do_transform = MethodType(self._var_transforms, pdf)
         return pdf
 
 
@@ -165,10 +161,10 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     @zfit.supports()
     def _sample_and_weights(self, n_to_produce, limits, dtype):
         gen_parts, *output = self._do_sample(n_to_produce, limits)
-        gen_parts = self._do_transform(gen_parts)
-        gen_parts = tf.concat([gen_parts[obs]
+        obs_vars = self._do_transform(gen_parts)
+        obs_vars = tf.concat([obs_vars[obs]
                                for obs in self._obs.obs], axis=1)
-        return tuple([gen_parts] + output)
+        return tuple([obs_vars] + output)
 
     def _do_sample(self, n_to_produce, limits):
         pseudo_yields = []
