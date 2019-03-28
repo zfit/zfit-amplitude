@@ -38,12 +38,12 @@ RESONANCES = [('rho(770)', ('pi-', 'pi0'), bw_amplitude),
               ('K(0)*(1430)0', ('K+', 'pi-'), bw_amplitude),
               ('K*(892)0', ('K+', 'pi-'), bw_amplitude)]
 
-COEFFS = {'rho(770)': polar_param('f(rho(770))', 1.0, 0.0, floating=False),
-          'K(2)*(1430)0': polar_param('f(K2star(1430)0)', 0.088, radians(-17.2)),
-          'K(0)*(1430)+': polar_param('f(K0star(1430)plus)', 6.78, radians(69.1)),
-          'K*(892)+': polar_param('f(Kstar(892)plus)', 0.899, radians(-171)),
-          'K(0)*(1430)0': polar_param('f(K0star(1430)0)', 1.65, radians(-44.4)),
-          'K*(892)0': polar_param('f(Kstar(892)0)', 0.398, radians(24.1))}
+COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
+          'K(2)*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
+          'K(0)*(1430)+': polar_param('f_K0star1430_plus', 6.78, radians(69.1)),
+          'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-171)),
+          'K(0)*(1430)0': polar_param('f_K0star1430_0', 1.65, radians(-44.4)),
+          'K*(892)0': polar_param('f_Kstar892_0', 0.398, radians(24.1))}
 
 
 if __name__ == "__main__":

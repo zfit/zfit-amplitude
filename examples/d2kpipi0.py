@@ -21,6 +21,8 @@ import zfit_amplitude.dynamics as dynamics
 import zfit_amplitude.kinematics as kinematics
 
 
+polar_param = zfit.ComplexParameter.from_polar
+
 # pylint: disable=E1101
 PI_MINUS = lp.pi_minus
 PI_ZERO = lp.pi_0
@@ -35,12 +37,12 @@ RESONANCES = {'rho(770)': ('m2pipi', lp.rho_770_plus),
               'K0*(1430)0': ('m2kpim', lp.K_0st_1430_0),
               'K*(892)0': ('m2kpim', lp.Kst_892_0)}
 
-COEFFS = {'rho(770)': zfit.ComplexParameter.from_polar('f(rho(770))', 1.0, 0.0, floating=False),
-          'K2*(1430)0': zfit.ComplexParameter.from_polar('f(K2star(1430)0)', 0.088, radians(-17.2)),
-          'K0*(1430)+': zfit.ComplexParameter.from_polar('f(K0star(1430)plus)', 6.78, radians(69.1)),
-          'K*(892)+': zfit.ComplexParameter.from_polar('f(Kstar(892)plus)', 0.899, radians(-171)),
-          'K0*(1430)0': zfit.ComplexParameter.from_polar('f(K0star(1430)0)', 1.65, radians(-44.4)),
-          'K*(892)0': zfit.ComplexParameter.from_polar('f(Kstar(892)0)', 0.398, radians(24.1))}
+COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
+          'K2*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
+          'K0*(1430)+': polar_param('f_K0star1430_plus', 6.78, radians(69.1)),
+          'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-171)),
+          'K0*(1430)0': polar_param('f_K0star1430_0', 1.65, radians(-44.4)),
+          'K*(892)0': polar_param('f_Kstar892_0', 0.398, radians(24.1))}
 
 
 def resonance_mass(mass, width, name):
