@@ -77,7 +77,7 @@ class Decay:
                     else:
                         parts.extend(recurse(children))
                 return parts
-            return amp.decay_tree[2]
+            return recurse(amp.decay_tree[2])
 
         if self._amplitudes:
             if set(get_final_state_particles(self._amplitudes[-1])) != set(get_final_state_particles(amplitude)):
@@ -162,6 +162,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     def _sample_and_weights(self, n_to_produce, limits, dtype):
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
+        if set(obs_vars.keys()) != set(self._obs.obs):
+            raise
         obs_vars = tf.concat([obs_vars[obs]
                                for obs in self._obs.obs], axis=1)
         return tuple([obs_vars] + output)

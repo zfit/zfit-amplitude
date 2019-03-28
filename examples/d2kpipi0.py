@@ -77,13 +77,13 @@ class D2Kpipi0Amplitude(Amplitude):
         elif self.mass_var == 'm2kpim':
             decay_tree = ('D0', D_ZERO.mass, [
                 (self.resonance.name, res_mass, [
-                    ('K-', K_PLUS.mass, []),
+                    ('K+', K_PLUS.mass, []),
                     ('pi0', PI_ZERO.mass, [])]),
                 ('pi-', PI_MINUS.mass, [])])
         else:
             decay_tree = ('D0', D_ZERO.mass, [
                 (self.resonance.name, res_mass, [
-                    ('K-', K_PLUS.mass, []),
+                    ('K+', K_PLUS.mass, []),
                     ('pi-', PI_MINUS.mass, [])]),
                 ('pi0', PI_ZERO.mass, [])])
         super().__init__(decay_tree)
