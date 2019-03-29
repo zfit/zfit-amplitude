@@ -1,4 +1,4 @@
-lambda_gamma: 1.0 1
+lambda_gamma: 0.5 1
 obs:
     particle-names:
         gamma: 'gamma'

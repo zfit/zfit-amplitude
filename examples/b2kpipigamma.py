@@ -16,6 +16,7 @@ from particle import Particle
 from particle.particle import literals as lp
 
 import zfit
+from zfit import ztf
 from zfit.core.parameter import Parameter, ComplexParameter
 
 from zfit_amplitude.amplitude import Decay, Amplitude, SumAmplitudeSquaredPDF
@@ -27,6 +28,7 @@ suppress_gpu = True  # doesn't really help currently, reciprocal complex not sup
 # suppress_gpu = False
 if suppress_gpu:
     import os
+
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
@@ -45,6 +47,7 @@ def kres_mass(kres_mass, kres_width, dec_string):
                                                   name=f'Kres_BW({dec_string})',
                                                   mres=kres_mass, wres=kres_width).sample(n_events)
         return tf.reshape(bw_res, 1, n_events)
+
     return get_kres_mass
 
 
@@ -55,6 +58,7 @@ def vres_mass(vres_mass, vres_width, dec_string):
                                                 name=f'Vres_BW({dec_string})',
                                                 mres=vres_mass, wres=vres_width).sample(n_events)
         return tf.reshape(bw_v, (1, n_events))
+
     return get_vres_mass
 
 
@@ -137,6 +141,20 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
 SCALE = 1e4
 
 
+class HackSampleSumPDF(zfit.pdf.SumPDF):
+    @zfit.supports()
+    def _sample(self, n, limits):
+        # assuming only sum of 2 pdfs
+        if len(self.pdfs) > 2 or self.is_extended:
+            raise RuntimeError("This is a simple adhoc example, only use with 2 pdfs and non-extended.")
+        n_sample1 = tf.ceil(n * self.fracs[0])
+        n_sample2 = n - n_sample1
+        print("using sampling")
+        sample = tf.concat([pdf.sample(n=n, limits=limits)
+                            for n, pdf in zip((n_sample1, n_sample2), self.pdfs)],
+                           axis=0)
+        return sample
+
 class Bp2KpipiGamma(Decay):
     """Generate a sum of amplitudes for photon polarization measurements.
 
@@ -211,14 +229,16 @@ class Bp2KpipiGamma(Decay):
                                           coef_list=self._coeffs,
                                           top_particle_mass=self._amplitudes[0].top_particle_mass)
         safe_lambda_gamma = tf.minimum(self.lambda_gamma, 1.)
-        return zfit.pdf.SumPDF([right_pdf, left_pdf], [((1 + safe_lambda_gamma) / 2)], name="Sum_L_R")
+        return HackSampleSumPDF([right_pdf, left_pdf], [((1 + safe_lambda_gamma) / 2)], name="Sum_L_R")
 
 
 if __name__ == "__main__":
     import tensorflow as tf
     import platform
+
     if platform.system() == 'Darwin':
         import matplotlib
+
         matplotlib.use('TkAgg')
 
     import matplotlib.pyplot as plt
@@ -235,7 +255,7 @@ if __name__ == "__main__":
     print("limits area", limits.area())
     zfit.settings.set_verbosity(6)
 
-    sample = pdf.sample(n=30000, limits=limits)
+    sample = pdf.sample(n=3000, limits=limits)
 
     sample_np = zfit.run(sample)
     print("Shape sample produced: {}".format(sample_np.shape))

@@ -35,7 +35,9 @@ class Decay:
         configuration.
 
     """
-    def __init__(self, obs, amplitudes=None, coeffs=None, sampling_function=None, variable_transformations=None):  # noqa: W107
+
+    def __init__(self, obs, amplitudes=None, coeffs=None, sampling_function=None,
+                 variable_transformations=None):  # noqa: W107
         if amplitudes:
             if len(amplitudes) != len(coeffs):
                 raise ValueError("Amplitude and coefficient lists must have the same length!")
@@ -48,7 +50,8 @@ class Decay:
         if not sampling_function:  # We do phasespace sampling
             if not variable_transformations:  # We need to have 4-momenta as obs!
                 if len(obs.obs) < 8 or len(obs.obs) % 4:
-                    raise KeyError("Requested sampling in phasespace but it doesn't seem like observables are 4-momenta")
+                    raise KeyError(
+                        "Requested sampling in phasespace but it doesn't seem like observables are 4-momenta")
         self._sampling_function = sampling_function
         self._var_transforms = variable_transformations
 
@@ -68,6 +71,7 @@ class Decay:
                 a different final state.
 
         """
+
         def get_final_state_particles(amp):
             def recurse(leaves):
                 parts = []
@@ -77,6 +81,7 @@ class Decay:
                     else:
                         parts.extend(recurse(children))
                 return parts
+
             return recurse(amp.decay_tree[2])
 
         if self._amplitudes:
@@ -120,6 +125,18 @@ class Decay:
         return pdf
 
 
+def generator_sample_and_weights_factory(self):
+    def sample_and_weights(n_to_produce, limits, dtype):
+        gen_parts, *output = self._do_sample(n_to_produce, limits)
+        obs_vars = self._do_transform(gen_parts)
+        if set(obs_vars.keys()) != set(self._obs.obs):
+            raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self._obs.obs}")
+        obs_vars = tf.concat([obs_vars[obs]
+                              for obs in self._obs.obs], axis=1)
+        return tuple([obs_vars] + output)
+    return sample_and_weights
+
+
 class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     r"""Deal with squared sums of amplitudes in a smart way.
 
@@ -146,6 +163,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         self._top_at_rest = tf.stack((0.0, 0.0, 0.0, top_particle_mass), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
         self.update_integration_options(draws_per_dim=300000)
+        self._sample_and_weights = MethodType(generator_sample_and_weights_factory, self)
 
     def _unnormalized_pdf(self, x):
         def unnormalized_pdf_func(x):
@@ -157,16 +175,6 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
 
         result = ztf.run_no_nan(unnormalized_pdf_func, x)
         return result
-
-    @zfit.supports()
-    def _sample_and_weights(self, n_to_produce, limits, dtype):
-        gen_parts, *output = self._do_sample(n_to_produce, limits)
-        obs_vars = self._do_transform(gen_parts)
-        if set(obs_vars.keys()) != set(self._obs.obs):
-            raise
-        obs_vars = tf.concat([obs_vars[obs]
-                               for obs in self._obs.obs], axis=1)
-        return tuple([obs_vars] + output)
 
     def _do_sample(self, n_to_produce, limits):
         pseudo_yields = []
@@ -210,9 +218,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
             integral = self._external_integral(limits=limits, norm_range=norm_range)
         else:
             integral = tf.reduce_sum(
-                [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm_range=norm_range)
-                 for frac1, frac2, amps in self._amplitudes_combinations],
-                axis=0)
+                    [(frac1 * frac2.conj) * amps.integrate(limits=limits, norm_range=norm_range)
+                     for frac1, frac2, amps in self._amplitudes_combinations],
+                    axis=0)
             integral = ztf.to_real(integral)
         return integral
 
@@ -239,6 +247,7 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
 
     def _func(self, x):
         amp1, amp2 = self.funcs
+
         def func(x):
             return amp1.func(x) * tf.math.conj(amp2.func(x))
 
