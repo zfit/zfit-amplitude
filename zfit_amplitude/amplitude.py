@@ -106,18 +106,18 @@ class Decay:
         """list[:py:class:~zfit.core.parameter.Parameter]: Coefficients of each amplitude."""
         return self._coeffs
 
-    def pdf(self, name):
+    def pdf(self, name, **kwargs):
         """Get the PDF representing the decay."""
-        return self._pdf(name)
+        return self._pdf(name, **kwargs)
 
-    def _pdf(self, name, external_integral=None):
+    def _pdf(self, name, external_integral=None, **kwargs):
         pdf = SumAmplitudeSquaredPDF(obs=self.obs,
                                      name=name,
-                                     amp_list=[amp.amplitude(self._obs)
-                                               for amp in self._amplitudes],
+                                     amp_list=self._amplitudes,
                                      coef_list=self._coeffs,
                                      top_particle_mass=self._amplitudes[0].top_particle_mass,
-                                     external_integral=external_integral)
+                                     external_integral=external_integral,
+                                     **kwargs)
         if self._sampling_function:
             pdf._do_sample = MethodType(self._sampling_function, pdf)
         if self._var_transforms:
@@ -154,13 +154,18 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
 
     def __init__(self, obs, amp_list, coef_list, top_particle_mass,
                  name="SumAmplitudeSquaredPDF", external_integral=None,
+                 amplitude_extra_config=None,
                  **kwargs):
         self._external_integral = external_integral
-        self._amplitudes_combinations = [(frac1, frac2, AmplitudeProductCached(amp1=amp1, amp2=amp2))
-                                         for (amp1, frac1), (amp2, frac2)
-                                         in combinations(list(zip(amp_list, coef_list)), 2)]
-        self._amplitudes = list(zip(coef_list, amp_list))
-        self._top_at_rest = tf.stack((0.0, 0.0, 0.0, top_particle_mass), axis=-1)
+        amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
+        self._amplitudes = [(frac, amp, amp.amplitude(obs, **amplitude_extra_config))
+                                 for frac, amp in zip(coef_list, amp_list)]
+        self._amplitudes_combinations = [(frac1, frac2,
+                                          AmplitudeProductCached(amp1=amp1,
+                                                                 amp2=amp2))
+                                         for (frac1, _, amp1), (frac2, _, amp2)
+                                         in combinations(self._amplitudes, 2)]
+        self._top_at_rest = tf.stack((0.0, 0.0, 0.0, ztf.to_real(top_particle_mass)), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
         self.update_integration_options(draws_per_dim=300000)
         self._sample_and_weights = MethodType(generator_sample_and_weights_factory, self)
@@ -179,16 +184,17 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     def _do_sample(self, n_to_produce, limits):
         pseudo_yields = []
         generators = []
-        for frac, amp in self._amplitudes:
-            pseudo_yields.append(frac * frac.conj * amp.integrate(limits=limits, norm_range=False))
+        for frac, amp, amp_func in self._amplitudes:
+            pseudo_yields.append(ztf.to_real(frac * frac.conj * amp_func.integrate(limits=limits, norm_range=False)))
             generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
-        n_to_generate = [tf.math.ceil(n_to_produce * pseudo_yield / sum_yields)
+        n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
                          for pseudo_yield in pseudo_yields]
 
         norm_weights = []
         particles = {}
-        for amp_num, (_, amp) in enumerate(self._amplitudes):
+        for amp_num in range(len(self._amplitudes)):
+            print(f"Generating {amp_num}")
             norm_weight, parts = generators[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
             norm_weights.append(norm_weight)
             for part_name, gen_parts in parts.items():

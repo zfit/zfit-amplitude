@@ -103,7 +103,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         if wave not in WAVES:
             raise ValueError(f"Unknown wave -> {wave}")
         self.wave = wave
-        dec_string = sanitize_string('{self.kres.name}->{self.vres.name}{self.p1_part.name}')
+        dec_string = sanitize_string(f"{self.kres.name}->{self.vres.name}{self.p1_part.name}")
         decay_tree = ('B+', lp.B_plus.mass, [
             (self.kres.name, kres_mass(self.kres.mass, self.kres.width, dec_string), [
                 (self.vres.name, vres_mass(self.vres.mass, self.vres.width, dec_string), [
@@ -219,15 +219,15 @@ class Bp2KpipiGamma(Decay):
 
         """
         right_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name=f"{name}_R",
-                                           amp_list=[amp.amplitude(self.obs, chirality="R")
-                                                     for amp in self._amplitudes],
+                                           amp_list=self._amplitudes,
                                            coef_list=self._coeffs,
-                                           top_particle_mass=self._amplitudes[0].top_particle_mass)
+                                           top_particle_mass=self._amplitudes[0].top_particle_mass,
+                                           amplitude_extra_config={'chirality': "R"})
         left_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name=f"{name}_L",
-                                          amp_list=[amp.amplitude(self.obs, chirality="L")
-                                                    for amp in self._amplitudes],
+                                          amp_list=self._amplitudes,
                                           coef_list=self._coeffs,
-                                          top_particle_mass=self._amplitudes[0].top_particle_mass)
+                                          top_particle_mass=self._amplitudes[0].top_particle_mass,
+                                          amplitude_extra_config={'chirality': "L"})
         safe_lambda_gamma = tf.minimum(self.lambda_gamma, 1.)
         return HackSampleSumPDF([right_pdf, left_pdf], [((1 + safe_lambda_gamma) / 2)], name="Sum_L_R")
 
