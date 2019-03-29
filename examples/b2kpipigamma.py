@@ -88,12 +88,12 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             self.p1_part = lp.K_plus
             self.p2_part = lp.pi_plus
             self.p3_part = lp.pi_minus
-            self.particle_order = ('K+', 'pi+', 'pi-', 'gamma')
+            self.vres_children = slice(4, 13)  # ('K+', 'pi+', 'pi-', 'gamma')
         elif self.vres in V2KPI:
             self.p1_part = lp.pi_plus
             self.p2_part = lp.K_plus
             self.p3_part = lp.pi_minus
-            self.particle_order = ('pi+', 'K+', 'pi-', 'gamma')
+            self.vres_children = slice(0, 9)  # ('pi+', 'K+', 'pi-', 'gamma')
         else:
             raise ValueError(f"Vres not implemented! -> {self.vres.fullname}")
         if wave not in WAVES:
@@ -109,24 +109,17 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
             ('gamma', 0.0, [])])
         super().__init__(decay_tree)
 
-    def _amplitude(self, obs_dict, chirality):
+    def _amplitude(self, all_vectors_obs, chirality):
         """Get the full decay amplitude."""
-        all_vectors_obs = functools.reduce(operator.mul,
-                                           [obs_dict[particle_name]
-                                            for particle_name in self.particle_order])
         helicity = +1 if chirality == 'R' else -1
-        sf = dynamics.SpinFactor(all_vectors_obs, "1+", self.wave, helicity, self.kres.mass, self.vres.mass)
-        kres_obs = functools.reduce(operator.mul,
-                                    [obs_dict[particle_name]
-                                     for particle_name in self.particle_order[:-1]])
+        spin_factor = dynamics.SpinFactor(all_vectors_obs, "1+", self.wave, helicity, self.kres.mass, self.vres.mass)
+        kres_obs = all_vectors_obs.get_subspace(all_vectors_obs.obs[:-4])
         kres_bw = dynamics.RelativisticBreitWigner(obs=kres_obs, name="Kres_BW", mres=self.kres.mass,
                                                    wres=self.kres.width)
-        vres_obs = functools.reduce(operator.mul,
-                                    [obs_dict[particle_name]
-                                     for particle_name in self.particle_order[1:-1]])
+        vres_obs = all_vectors_obs.get_subspace(all_vectors_obs.obs[self.vres_children])
         vres_bw = dynamics.RelativisticBreitWigner(obs=vres_obs, name="Vres_BW", mres=self.vres.mass,
                                                    wres=self.vres.width)
-        return sf * kres_bw * vres_bw
+        return spin_factor * kres_bw * vres_bw
 
     def _decay_string(self):
         """Build a decay string.
@@ -187,18 +180,19 @@ class Bp2KpipiGamma(Decay):
                                                    mod=a_i, arg=phi_i)
             amplitudes.append(amplitude)
             coeffs.append(fraction)
-        obs_dict = self._build_obs(config.get('obs', {}))
-        super().__init__(obs_dict, amplitudes, coeffs)
+        obs = self._build_obs(config.get('obs', {}))
+        super().__init__(obs, amplitudes, coeffs)
 
     @staticmethod
     def _build_obs(obs_def):
         particle_names = obs_def.get('particle-names', Bp2KpipiGamma.DEFAULT_PARTICLE_NAMES)
         comp_names = obs_def.get('component-names', Bp2KpipiGamma.DEFAULT_COMPONENT_NAMES)
-        return {particle: functools.reduce(operator.mul,
-                                           [zfit.Space(obs=particle_names[particle] + comp_names[component],
-                                                       limits=Bp2KpipiGamma.DEFAULT_RANGES[component])
-                                            for component in ('x', 'y', 'z', 'e')])
-                for particle in ('K+', 'pi-', 'pi+', 'gamma')}
+        return functools.reduce(operator.mul,
+                                [functools.reduce(operator.mul,
+                                                  [zfit.Space(obs=particle_names[particle] + comp_names[component],
+                                                              limits=Bp2KpipiGamma.DEFAULT_RANGES[component])
+                                                   for component in ('x', 'y', 'z', 'e')])
+                                 for particle in ('K+', 'pi-', 'pi+', 'gamma')])
 
     def _pdf(self, name):
         """Build the PDF.
@@ -206,13 +200,12 @@ class Bp2KpipiGamma(Decay):
         Sum incoherently the coherent sum of L and R, separately.
 
         """
-        flattened_obs = functools.reduce(operator.mul, self.obs.values())
-        right_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name=f"{name}_R",
+        right_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name=f"{name}_R",
                                            amp_list=[amp.amplitude(self.obs, chirality="R")
                                                      for amp in self._amplitudes],
                                            coef_list=self._coeffs,
                                            top_particle_mass=self._amplitudes[0].top_particle_mass)
-        left_pdf = SumAmplitudeSquaredPDF(obs=flattened_obs, name=f"{name}_L",
+        left_pdf = SumAmplitudeSquaredPDF(obs=self.obs, name=f"{name}_L",
                                           amp_list=[amp.amplitude(self.obs, chirality="L")
                                                     for amp in self._amplitudes],
                                           coef_list=self._coeffs,
@@ -233,7 +226,7 @@ if __name__ == "__main__":
     decay = Bp2KpipiGamma('b2kpipigamma.yaml')
     lower = (tuple([-SCALE, -SCALE, -SCALE, 10] * 4),)  # last one is energy, only positive
     upper = (tuple([SCALE, SCALE, SCALE, SCALE] * 4),)
-    limits = zfit.Space(obs=functools.reduce(operator.mul, decay.obs.values()), limits=(lower, upper))
+    limits = zfit.Space(obs=decay.obs, limits=(lower, upper))
 
     pdf = decay.pdf("Test")
     pdf.update_integration_options(draws_per_dim=300000)
