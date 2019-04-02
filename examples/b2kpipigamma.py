@@ -9,6 +9,7 @@
 
 import operator
 import functools
+from typing import Tuple, Optional
 
 import yaml
 
@@ -18,6 +19,7 @@ from particle.particle import literals as lp
 import zfit
 from zfit import ztf
 from zfit.core.parameter import Parameter, ComplexParameter
+from zfit.util import ztyping
 
 from zfit_amplitude.amplitude import Decay, Amplitude, SumAmplitudeSquaredPDF
 import zfit_amplitude.dynamics as dynamics
@@ -138,6 +140,27 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         return decay_str
 
 
+class EventSpaces(zfit.Space):
+
+    def __init__(self, obs: ztyping.ObsTypeInput, limits: Optional[ztyping.LimitsTypeInput] = None, factory=None,
+                 name: Optional[str] = "Space"):
+        self._limits_tensor = None
+        self._factory = factory
+        super().__init__(obs, limits, name)
+
+    def create_limits(self, n):
+        self._limits_tensor = self._factory(n)
+
+    def iter_areas(self, rel: bool = False) -> Tuple[float, ...]:
+        raise RuntimeError("Cannot be called with an event space.")
+
+    def add(self, other: ztyping.SpaceOrSpacesTypeInput):
+        raise RuntimeError("Cannot be called with an event space.")
+
+    def combine(self, other: ztyping.SpaceOrSpacesTypeInput):
+        raise RuntimeError("Cannot be called with an event space.")
+
+
 SCALE = 1e4
 
 
@@ -154,6 +177,7 @@ class HackSampleSumPDF(zfit.pdf.SumPDF):
                             for n, pdf in zip((n_sample1, n_sample2), self.pdfs)],
                            axis=0)
         return sample
+
 
 class Bp2KpipiGamma(Decay):
     """Generate a sum of amplitudes for photon polarization measurements.
