@@ -156,7 +156,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                  **kwargs):
         self._external_integral = external_integral
         amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
-        self._amplitudes = [(frac, amp, amp.amplitude(obs, **amplitude_extra_config))
+        self._amplitudes = [(frac, amp, amp.amplitude(obs, **amp_extra_config))
                                  for frac, amp in zip(coef_list, amp_list)]
         self._amplitudes_combinations = [(frac1, frac2,
                                           AmplitudeProductCached(amp1=amp1,
