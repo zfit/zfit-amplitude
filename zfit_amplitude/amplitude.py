@@ -12,6 +12,7 @@ from types import MethodType
 from itertools import combinations
 
 import tensorflow as tf
+
 import zfit
 from zfit import ztf
 from zfit.core.interfaces import ZfitFunc
@@ -123,15 +124,18 @@ class Decay:
         return pdf
 
 
+# pylint: disable=W0212
 def generator_sample_and_weights_factory(self):
-    def sample_and_weights(n_to_produce, limits, dtype):
+    def sample_and_weights(n_to_produce, limits, dtype=None):
+        if isinstance(limits, zfit.core.sample.EventSpace):
+            limits.create_limits(n=n_to_produce)
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
         if set(obs_vars.keys()) != set(self._obs.obs):
             raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self._obs.obs}")
-        obs_vars = tf.concat([obs_vars[obs]
-                              for obs in self._obs.obs], axis=1)
+        obs_vars = tf.concat([obs_vars[obs] for obs in self._obs.obs], axis=1)
         return tuple([obs_vars] + output)
+
     return sample_and_weights
 
 
@@ -183,7 +187,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         pseudo_yields = []
         generators = []
         for frac, amp, amp_func in self._amplitudes:
-            pseudo_yields.append(ztf.to_real(frac * frac.conj * amp_func.integrate(limits=limits, norm_range=False)))
+            pseudo_yields.append(ztf.to_real(frac * frac.conj *
+                                             amp_func.integrate(limits=limits.get_subspace(amp_func.obs),
+                                                                norm_range=False)))
             generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
         n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
@@ -202,8 +208,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                 merged_particles = {part_name: tf.concat(particles, axis=0)
                                     for part_name, part_list in particles}
         merged_weights = tf.concat(norm_weights, axis=0)
-        thresholds = tf.random_uniform(shape=(n_to_produce,))
-        return merged_particles, thresholds, merged_weights, sum_yields, len(merged_weights)
+        thresholds = ztf.random_uniform(shape=(n_to_produce,))
+        return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)
 
     def _do_transform(self, particle_dict):
         """Identity.
@@ -414,7 +420,7 @@ class Resonance:
         """
         args = self._model_config.copy()
         args.update(extra_args)
-        return self._model(obs=obs, name=name, **args)
+        return self._model(obs=obs, name=sanitize_string(name), **args)
 
     def mass_sampler(self, name='', **extra_args):
         """Get mass sampler to use for phasespace generation.
@@ -431,19 +437,20 @@ class Resonance:
         """
         args = self._model_config.copy()
         args.update(extra_args)
+        name = sanitize_string(name)
 
         def get_resonance_mass(mass_min, mass_max, n_events):
-            def factory(_):
-                return mass_min(), mass_max()
+            def factory(n_to_generate):
+                return mass_min(n_to_generate), mass_max(n_to_generate)
 
             space = zfit.core.sample.EventSpace(f'M({name})',
                                                 limits=(lambda lim: lim[0],
                                                         lambda lim: lim[1]),
                                                 factory=factory)
-            resonance = self._model(obs=space,
-                                    name=f'BW({name})',
-                                    **args).sample(n_events)
-            return tf.reshape(resonance, (1, n_events))
+            return tf.reshape(self._model(obs=space,
+                                          name=f'BW({name})',
+                                          **args).sample(n_events),
+                              (1, n_events))
 
         return get_resonance_mass
 
