@@ -7,11 +7,9 @@
 # =============================================================================
 """Base amplitude classes."""
 
-from collections import OrderedDict
 from types import MethodType
 
 from itertools import combinations
-import functools
 
 import tensorflow as tf
 import zfit
@@ -386,4 +384,83 @@ class Amplitude:
         top_name, _, top_tree = self._decay_tree
         return phsp.Particle(top_name).set_children(*create_particles(top_tree))
 
+
+class Resonance:
+    """Resonance to be used for amplitude building and phasespace sampling.
+
+    Arguments:
+        particle (:py:class:`~particle.Particle`): Particle object corresponding to the
+        resonance we want to model.
+        resonance_model (:py:class:`~zfit.func.BaseFunc`): Class to model the resonance.
+        model_config (dict): Configuration of `resonance_model`.
+
+    """
+    def __init__(self, particle, resonance_model, **model_config):  # noqa
+        self.particle = particle
+        self._model = resonance_model
+        self._model_config = model_config
+
+    def amplitude(self, name, obs, **extra_args):
+        """Get amplitude to build PDFs.
+
+        Arguments:
+            name (str): Name of the amplitude.
+            obs (:py:class:`~zfit.Space`): Observable space for the resonance.
+            extra_args (dict): Extra configuration to pass to the resonance model.
+
+        Return:
+            :py:class:`~zfit.func.BaseFunc`
+
+        """
+        args = self._model_config.copy()
+        args.update(extra_args)
+        return self._model(obs=obs, name=name, **args)
+
+    def mass_sampler(self, name='', **extra_args):
+        """Get mass sampler to use for phasespace generation.
+
+        Build a function that can be used for mass sampling in the `phasespace` package.
+
+        Arguments:
+            name (str): Name of the amplitude.
+            extra_args (dict): Extra configuration to pass to the resonance model.
+
+        Return:
+            Callable.
+
+        """
+        args = self._model_config.copy()
+        args.update(extra_args)
+
+        def get_resonance_mass(mass_min, mass_max, n_events):
+            def factory(_):
+                return mass_min(), mass_max()
+
+            space = zfit.core.sample.EventSpace(f'M({name})',
+                                                limits=(lambda lim: lim[0],
+                                                        lambda lim: lim[1]),
+                                                factory=factory)
+            resonance = self._model(obs=space,
+                                    name=f'BW({name})',
+                                    **args).sample(n_events)
+            return tf.reshape(resonance, (1, n_events))
+
+        return get_resonance_mass
+
+    @property
+    def name(self):
+        """str: Name of the resonance."""
+        return self.particle.name
+
+    @property
+    def mass(self):
+        """float: Mass of the resonance."""
+        return self.particle.mass
+
+    @property
+    def width(self):
+        """float: Width of the resonance."""
+        return self.particle.width
+
 # EOF
+
