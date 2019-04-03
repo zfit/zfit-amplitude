@@ -140,25 +140,7 @@ class B2KP1P2P3GammaAmplitude(Amplitude):
         return decay_str
 
 
-class EventSpaces(zfit.Space):
 
-    def __init__(self, obs: ztyping.ObsTypeInput, limits: Optional[ztyping.LimitsTypeInput] = None, factory=None,
-                 name: Optional[str] = "Space"):
-        self._limits_tensor = None
-        self._factory = factory
-        super().__init__(obs, limits, name)
-
-    def create_limits(self, n):
-        self._limits_tensor = self._factory(n)
-
-    def iter_areas(self, rel: bool = False) -> Tuple[float, ...]:
-        raise RuntimeError("Cannot be called with an event space.")
-
-    def add(self, other: ztyping.SpaceOrSpacesTypeInput):
-        raise RuntimeError("Cannot be called with an event space.")
-
-    def combine(self, other: ztyping.SpaceOrSpacesTypeInput):
-        raise RuntimeError("Cannot be called with an event space.")
 
 
 SCALE = 1e4

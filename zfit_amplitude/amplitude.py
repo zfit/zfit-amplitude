@@ -12,6 +12,7 @@ from types import MethodType
 
 from itertools import combinations
 import functools
+from typing import Optional, Tuple
 
 import tensorflow as tf
 import zfit
@@ -20,6 +21,7 @@ from zfit.core.interfaces import ZfitFunc
 
 from zfit.models.functions import BaseFunctorFunc
 from zfit.util.execution import SessionHolderMixin
+from zfit import ztyping
 
 from zfit_amplitude.utils import sanitize_string
 
@@ -124,9 +126,48 @@ class Decay:
             pdf._do_transform = MethodType(self._var_transforms, pdf)
         return pdf
 
+class EventSpace(zfit.Space):
+    """EXPERIMENTAL SPACE CLASS!"""
+
+    def __init__(self, obs: ztyping.ObsTypeInput, limits: ztyping.LimitsTypeInput, factory=None,
+                 name: Optional[str] = "Space"):
+        if limits is None:
+            raise ValueError("Limits cannot be None for EventSpaces (currently)")
+        self._limits_tensor = None
+        self._factory = factory
+        super().__init__(obs, limits, name)
+
+    @property
+    def limits(self) -> ztyping.LimitsTypeReturn:
+        limits = super().limits()
+        limits_tensor = self._limits_tensor
+        if limits_tensor is not None:
+            lower, upper = limits
+            new_bounds = [[], []]
+            for i, old_bounds in enumerate(lower, upper):
+                for bound in old_bounds:
+                    new_bound = (lim(limits_tensor) for lim in bound)
+                    new_bounds[i].append(new_bound)
+                new_bounds[i] = tuple(new_bounds[i])
+        return tuple(new_bounds)
+
+    def create_limits(self, n):
+        self._limits_tensor = self._factory(n)
+
+    def iter_areas(self, rel: bool = False) -> Tuple[float, ...]:
+        raise RuntimeError("Cannot be called with an event space.")
+
+    def add(self, other: ztyping.SpaceOrSpacesTypeInput):
+        raise RuntimeError("Cannot be called with an event space.")
+
+    def combine(self, other: ztyping.SpaceOrSpacesTypeInput):
+        raise RuntimeError("Cannot be called with an event space.")
 
 def generator_sample_and_weights_factory(self):
     def sample_and_weights(n_to_produce, limits, dtype):
+
+        if isinstance(limits, EventSpace):
+            limits.create_limits(n=n)
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
         if set(obs_vars.keys()) != set(self._obs.obs):
@@ -204,8 +245,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                 merged_particles = {part_name: tf.concat(particles, axis=0)
                                     for part_name, part_list in particles}
         merged_weights = tf.concat(norm_weights, axis=0)
-        thresholds = tf.random_uniform(shape=(n_to_produce,))
-        return merged_particles, thresholds, merged_weights, sum_yields, len(merged_weights)
+        thresholds = ztf.random_uniform(shape=(n_to_produce,))
+        return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)
 
     def _do_transform(self, particle_dict):
         """Identity.
