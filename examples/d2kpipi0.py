@@ -117,4 +117,6 @@ if __name__ == "__main__":
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
+    pdf.sample(10)
+
 # EOF
