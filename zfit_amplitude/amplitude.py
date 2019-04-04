@@ -7,21 +7,18 @@
 # =============================================================================
 """Base amplitude classes."""
 
-from collections import OrderedDict
 from types import MethodType
 
 from itertools import combinations
-import functools
-from typing import Optional, Tuple
 
 import tensorflow as tf
+
 import zfit
 from zfit import ztf
 from zfit.core.interfaces import ZfitFunc
 
 from zfit.models.functions import BaseFunctorFunc
 from zfit.util.execution import SessionHolderMixin
-from zfit import ztyping
 
 from zfit_amplitude.utils import sanitize_string
 
@@ -126,55 +123,19 @@ class Decay:
             pdf._do_transform = MethodType(self._var_transforms, pdf)
         return pdf
 
-class EventSpace(zfit.Space):
-    """EXPERIMENTAL SPACE CLASS!"""
 
-    def __init__(self, obs: ztyping.ObsTypeInput, limits: ztyping.LimitsTypeInput, factory=None,
-                 name: Optional[str] = "Space"):
-        if limits is None:
-            raise ValueError("Limits cannot be None for EventSpaces (currently)")
-        self._limits_tensor = None
-        self._factory = factory
-        super().__init__(obs, limits, name)
-
-    @property
-    def limits(self) -> ztyping.LimitsTypeReturn:
-        limits = super().limits()
-        limits_tensor = self._limits_tensor
-        if limits_tensor is not None:
-            lower, upper = limits
-            new_bounds = [[], []]
-            for i, old_bounds in enumerate(lower, upper):
-                for bound in old_bounds:
-                    new_bound = (lim(limits_tensor) for lim in bound)
-                    new_bounds[i].append(new_bound)
-                new_bounds[i] = tuple(new_bounds[i])
-        return tuple(new_bounds)
-
-    def create_limits(self, n):
-        self._limits_tensor = self._factory(n)
-
-    def iter_areas(self, rel: bool = False) -> Tuple[float, ...]:
-        raise RuntimeError("Cannot be called with an event space.")
-
-    def add(self, other: ztyping.SpaceOrSpacesTypeInput):
-        raise RuntimeError("Cannot be called with an event space.")
-
-    def combine(self, other: ztyping.SpaceOrSpacesTypeInput):
-        raise RuntimeError("Cannot be called with an event space.")
-
+# pylint: disable=W0212
 def generator_sample_and_weights_factory(self):
-    def sample_and_weights(n_to_produce, limits, dtype):
-
-        if isinstance(limits, EventSpace):
-            limits.create_limits(n=n)
+    def sample_and_weights(n_to_produce, limits, dtype=None):
+        if isinstance(limits, zfit.core.sample.EventSpace):
+            limits.create_limits(n=n_to_produce)
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
         if set(obs_vars.keys()) != set(self._obs.obs):
             raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self._obs.obs}")
-        obs_vars = tf.concat([obs_vars[obs]
-                              for obs in self._obs.obs], axis=1)
+        obs_vars = tf.concat([obs_vars[obs] for obs in self._obs.obs], axis=1)
         return tuple([obs_vars] + output)
+
     return sample_and_weights
 
 
@@ -199,7 +160,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                  **kwargs):
         self._external_integral = external_integral
         amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
-        self._amplitudes = [(frac, amp, amp.amplitude(obs, **amplitude_extra_config))
+        self._amplitudes = [(frac, amp, amp.amplitude(obs, **amp_extra_config))
                                  for frac, amp in zip(coef_list, amp_list)]
         self._amplitudes_combinations = [(frac1, frac2,
                                           AmplitudeProductCached(amp1=amp1,
@@ -226,7 +187,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         pseudo_yields = []
         generators = []
         for frac, amp, amp_func in self._amplitudes:
-            pseudo_yields.append(ztf.to_real(frac * frac.conj * amp_func.integrate(limits=limits, norm_range=False)))
+            pseudo_yields.append(ztf.to_real(frac * frac.conj *
+                                             amp_func.integrate(limits=limits.get_subspace(amp_func.obs),
+                                                                norm_range=False)))
             generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
         n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
@@ -427,4 +390,84 @@ class Amplitude:
         top_name, _, top_tree = self._decay_tree
         return phsp.Particle(top_name).set_children(*create_particles(top_tree))
 
+
+class Resonance:
+    """Resonance to be used for amplitude building and phasespace sampling.
+
+    Arguments:
+        particle (:py:class:`~particle.Particle`): Particle object corresponding to the
+        resonance we want to model.
+        resonance_model (:py:class:`~zfit.func.BaseFunc`): Class to model the resonance.
+        model_config (dict): Configuration of `resonance_model`.
+
+    """
+    def __init__(self, particle, resonance_model, **model_config):  # noqa
+        self.particle = particle
+        self._model = resonance_model
+        self._model_config = model_config
+
+    def amplitude(self, name, obs, **extra_args):
+        """Get amplitude to build PDFs.
+
+        Arguments:
+            name (str): Name of the amplitude.
+            obs (:py:class:`~zfit.Space`): Observable space for the resonance.
+            extra_args (dict): Extra configuration to pass to the resonance model.
+
+        Return:
+            :py:class:`~zfit.func.BaseFunc`
+
+        """
+        args = self._model_config.copy()
+        args.update(extra_args)
+        return self._model(obs=obs, name=sanitize_string(name), **args)
+
+    def mass_sampler(self, name='', **extra_args):
+        """Get mass sampler to use for phasespace generation.
+
+        Build a function that can be used for mass sampling in the `phasespace` package.
+
+        Arguments:
+            name (str): Name of the amplitude.
+            extra_args (dict): Extra configuration to pass to the resonance model.
+
+        Return:
+            Callable.
+
+        """
+        args = self._model_config.copy()
+        args.update(extra_args)
+        name = sanitize_string(name)
+
+        def get_resonance_mass(mass_min, mass_max, n_events):
+            def factory(n_to_generate):
+                return mass_min(n_to_generate), mass_max(n_to_generate)
+
+            space = zfit.core.sample.EventSpace(f'M({name})',
+                                                limits=(lambda lim: lim[0],
+                                                        lambda lim: lim[1]),
+                                                factory=factory)
+            return tf.reshape(self._model(obs=space,
+                                          name=f'BW({name})',
+                                          **args).sample(n_events),
+                              (1, n_events))
+
+        return get_resonance_mass
+
+    @property
+    def name(self):
+        """str: Name of the resonance."""
+        return self.particle.name
+
+    @property
+    def mass(self):
+        """float: Mass of the resonance."""
+        return self.particle.mass
+
+    @property
+    def width(self):
+        """float: Width of the resonance."""
+        return self.particle.width
+
 # EOF
+
