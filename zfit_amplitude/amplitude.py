@@ -124,8 +124,60 @@ class Decay:
         return pdf
 
 
-class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
-    """Crude implementation of cached amplitude product.
+class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
+    """Crude implementation of cached product of two amplitude functions.
+
+    Note:
+        This implementation currently assumes width and mean don't float, so the
+        cache is never invalidated. This will be fixed soon.
+
+    Arguments:
+        amp1: (:py:class:`~zfit.core.interfaces.ZfitFunc`): First amplitude.
+        amp2: (:py:class:`~zfit.core.interfaces.ZfitFunc`): Second amplitude.
+        projector (Callable): Projection function
+        name (str, optional): Name of the object.
+
+    """
+
+    def __init__(self, amp1: ZfitFunc, amp2: ZfitFunc, projector, name="AmplitudeProductCached", **kwargs):  # noqa: W107
+        self.projector = projector
+        super().__init__(funcs=[amp1, amp2], name=name, obs=None, **kwargs)
+
+    def _func(self, x):
+        amp1, amp2 = self.funcs
+
+        def func(x):
+            return self.projector(amp1.func(x) * tf.math.conj(amp2.func(x)))
+
+        return ztf.run_no_nan(func=func, x=x)
+
+    def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
+        integral = self._cache.get("integral")
+        if integral is None:
+            self._cache['integral'] = {}
+
+        # safer version
+        if integral is not None:
+            integral = integral.get((limits, norm_range))
+        # safer version end
+
+        if integral is None:
+            integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+            integral = self.sess.run(integral)
+            integral_holder = tf.Variable(initial_value=integral, trainable=False,
+                                          dtype=integral.dtype, use_resource=True)
+            self.sess.run(integral_holder.initializer)
+            # self._cache['integral'] = integral_holder
+            # safer version
+            self._cache['integral'][(limits, norm_range)] = integral_holder
+            # safer version end
+            integral = integral_holder
+
+        return integral
+
+
+class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
+    """Crude implementation of amplitude product.
 
     These products come from expressions such as
 
@@ -144,7 +196,7 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
 
     .. math::
 
-        2\\Re(a_1 a_2^*A_1A_2^*)
+        \\Re(a_1 a_2^*A_1A_2^*)
 
     This function does precisely rhis calculation, and caches the integral of the A_1A_2^* part
     to save computation time.
@@ -154,51 +206,35 @@ class AmplitudeProductCached(BaseFunctorFunc, SessionHolderMixin):
         cache is never invalidated. This will be fixed soon.
 
     Arguments:
-        amp1: :py:class:`~zfit.core.interfaces.ZfitFunc`: First amplitude.
-        amp2: :py:class:`~zfit.core.interfaces.ZfitFunc`: Second amplitude.
+        coef1 (:py:class:`~zfit.ComplexParameter`): Coefficient of the first amplitude.
+        coef2 (:py:class:`~zfit.ComplexParameter`): Coefficient of the second amplitude.
+        amp1 (:py:class:`~zfit.core.interfaces.ZfitFunc`): First amplitude.
+        amp2 (:py:class:`~zfit.core.interfaces.ZfitFunc`): Second amplitude.
         name (str, optional): Name of the object.
+        amp_product_class (:py:class:`~zfit.models.functions.BaseFunctorFunc`, optional):
+            Implementation of the product of amp1 and amp2.
 
     """
-
-    def __init__(self, coef1, coef2, amp1: ZfitFunc, amp2: ZfitFunc, name="AmplitudeProductCached", **kwargs):  # noqa: W107
-        self.coeffs = [coef1, coef2]
-        super().__init__(funcs=amp1 * tf.math.conj(amp2), name=name, obs=None, **kwargs)
+    def __init__(self, coef1, coef2, amp1: ZfitFunc, amp2: ZfitFunc, name="AmplitudeProduct",
+                 amp_product_class=AmplitudeProductProjectionCached, **kwargs):  # noqa: W107
+        self.coeff_prod = coef1 * coef2.conj
+        super().__init__(funcs=[amp_product_class(amp1, amp2, tf.math.imag, name=f"{name}ImagCached", **kwargs),
+                                amp_product_class(amp1, amp2, tf.math.real, name=f"{name}RealCached", **kwargs)],
+                         name=name, obs=None, **kwargs)
 
     def _func(self, x):
-        amp_prod = self.funcs
-        coef1, coef2 = self.coeffs
+        prod_real, prod_imag = self.funcs
 
         def func(x):
-            return coef1 * coef2.conj * amp_prod.func(x)
+            return ztf.to_real(self.coeff_prod * ztf.complex(prod_real(x), prod_imag(x)))
 
-        return ztf.to_real(ztf.run_no_nan(func=func, x=x))
+        return ztf.run_no_nan(func=func, x=x)
 
-    def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
-        integral = self._cache.get("integral")
-        if integral is None:
-            self._cache['integral'] = {}
-
-        # safer version
-        if integral is not None:
-            integral = integral.get((limits, norm_range))
-        # safer version end
-
-        if integral is None:
-            amp_prod = self.funcs
-            # integral = amp_prod._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
-            integral = amp_prod.integrate(limits=limits, norm_range=norm_range, name=name)
-            integral = self.sess.run(integral)
-            integral_holder = tf.Variable(initial_value=integral, trainable=False,
-                                          dtype=integral.dtype, use_resource=True)
-            self.sess.run(integral_holder.initializer)
-            # self._cache['integral'] = integral_holder
-            # safer version
-            self._cache['integral'][(limits, norm_range)] = integral_holder
-            # safer version end
-            integral = integral_holder
-
-        coef1, coef2 = self.coeffs
-        return ztf.to_real(coef1 * coef2.conj) * integral
+    @zfit.supports()
+    def _integrate(self, limits, norm_range, name='_integrate'):
+        prod_real, prod_imag = self.funcs
+        return ztf.to_real(self.coeff_prod * ztf.complex(prod_real.integrate(limits=limits, norm_range=norm_range),
+                                                         prod_imag.integrate(limits=limits, norm_range=norm_range)))
 
 
 # pylint: disable=W0212
@@ -247,7 +283,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     def __init__(self, obs, amp_list, coef_list, top_particle_mass,
                  name="SumAmplitudeSquaredPDF", external_integral=None,
                  amplitude_extra_config=None,
-                 amplitude_product_class=AmplitudeProductCached,
+                 amplitude_product_class=AmplitudeProduct,
                  **kwargs):  # noqa
         self._external_integral = external_integral
         amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
@@ -257,6 +293,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                              for (frac1, amp1), (frac2, amp2) in combinations(amplitudes, 2)]
         self._squared_terms = [amplitude_product_class(coef1=frac, coef2=frac, amp1=amp, amp2=amp)
                                for frac, amp in amplitudes]
+        __import__('ipdb').set_trace()
+        self._phsp = [amp.decay_phasespace() for amp in amp_list]
         self._top_at_rest = tf.stack((0.0, 0.0, 0.0, ztf.to_real(top_particle_mass)), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
         self.update_integration_options(draws_per_dim=300000)
@@ -275,11 +313,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
     def _do_sample(self, n_to_produce, limits):
         # FIXME: We'll be undershooting! We need to normalize to the full integral.
         pseudo_yields = []
-        generators = []
         for amp in self._squared_terms:
             pseudo_yields.append(amp.integrate(limits=limits.get_subspace(amp.obs),
                                                norm_range=False))
-            generators.append(amp.decay_phasespace())
         sum_yields = sum(pseudo_yields)
         n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
                          for pseudo_yield in pseudo_yields]
@@ -288,7 +324,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         particles = {}
         for amp_num in range(len(self._squared_terms)):
             print(f"Generating {amp_num}")
-            norm_weight, parts = generators[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
+            norm_weight, parts = self._phsp[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
             norm_weights.append(norm_weight)
             for part_name, gen_parts in parts.items():
                 if part_name not in particles:

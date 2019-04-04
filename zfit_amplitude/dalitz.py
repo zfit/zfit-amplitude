@@ -43,7 +43,7 @@ class ThreeBodyDalitz(Decay):
             part_obj = parts[part_num]
             name_counts = final_state_particles[:part_num].count(part_name)
             if name_counts > 0:
-                part_obj.dalitz_name = f"{part_obj.dalitz_name}{name_counts-0}"
+                part_obj.dalitz_name = f"{part_obj.dalitz_name}{name_counts-1}"
         self._parts = OrderedDict((part.dalitz_name, part) for part in parts)
         # Build observables
         obs1 = zfit.Space(obs=get_mass_var_name(p1, p2),
