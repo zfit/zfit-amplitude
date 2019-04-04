@@ -218,8 +218,8 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
     def __init__(self, coef1, coef2, amp1: ZfitFunc, amp2: ZfitFunc, name="AmplitudeProduct",
                  amp_product_class=AmplitudeProductProjectionCached, **kwargs):  # noqa: W107
         self.coeff_prod = coef1 * coef2.conj
-        super().__init__(funcs=[amp_product_class(amp1, amp2, tf.math.imag, name=f"{name}ImagCached", **kwargs),
-                                amp_product_class(amp1, amp2, tf.math.real, name=f"{name}RealCached", **kwargs)],
+        super().__init__(funcs=[amp_product_class(amp1, amp2, tf.math.real, name=f"{name}RealCached", **kwargs),
+                                amp_product_class(amp1, amp2, tf.math.imag, name=f"{name}ImagCached", **kwargs)],
                          name=name, obs=None, **kwargs)
 
     def _func(self, x):
