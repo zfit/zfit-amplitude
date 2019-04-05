@@ -139,9 +139,14 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
 
     """
 
-    def __init__(self, amp1: ZfitFunc, amp2: ZfitFunc, projector, name="AmplitudeProductCached", **kwargs):  # noqa: W107
+    def __init__(self, amp1: ZfitFunc, amp2: ZfitFunc, projector, name="AmplitudeProductCached",
+                 **kwargs):  # noqa: W107
         self.projector = projector
         super().__init__(funcs=[amp1, amp2], name=name, obs=None, **kwargs)
+        integral_holder = tf.Variable(initial_value=-42, trainable=False,
+                                          dtype=self.dtype, use_resource=True)
+        # self.sess.run(integral_holder.initializer)
+        self._product_cache_integral_holder = integral_holder
 
     def _func(self, x):
         amp1, amp2 = self.funcs
@@ -163,15 +168,14 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
 
         if integral is None:
             integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
-            integral = self.sess.run(integral)
-            integral_holder = tf.Variable(initial_value=integral, trainable=False,
-                                          dtype=integral.dtype, use_resource=True)
-            self.sess.run(integral_holder.initializer)
+            integral_holder = self._product_cache_integral_holder
+            assign_integral_op = integral_holder.assign(value=integral)
             # self._cache['integral'] = integral_holder
             # safer version
             self._cache['integral'][(limits, norm_range)] = integral_holder
             # safer version end
-            integral = integral_holder
+            with tf.control_dependencies([assign_integral_op]):
+                integral = tf.identity(integral_holder)
 
         return integral
 
@@ -215,6 +219,7 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
             Implementation of the product of amp1 and amp2.
 
     """
+
     def __init__(self, coef1, coef2, amp1: ZfitFunc, amp2: ZfitFunc, name="AmplitudeProduct",
                  amp_product_class=AmplitudeProductProjectionCached, **kwargs):  # noqa: W107
         self.coeff_prod = coef1 * coef2.conj
@@ -240,8 +245,6 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
 # pylint: disable=W0212
 def generator_sample_and_weights_factory(self):
     def sample_and_weights(n_to_produce, limits, dtype=None):
-        if isinstance(limits, zfit.core.sample.EventSpace):
-            limits.create_limits(n=n_to_produce)
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
         if set(obs_vars.keys()) != set(self._obs.obs):
@@ -474,6 +477,7 @@ class Resonance:
         model_config (dict): Configuration of `resonance_model`.
 
     """
+
     def __init__(self, particle, resonance_model, **model_config):  # noqa
         self.particle = particle
         self._model = resonance_model
@@ -539,4 +543,3 @@ class Resonance:
         return self.particle.width
 
 # EOF
-
