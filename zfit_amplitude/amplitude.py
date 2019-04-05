@@ -293,7 +293,6 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                              for (frac1, amp1), (frac2, amp2) in combinations(amplitudes, 2)]
         self._squared_terms = [amplitude_product_class(coef1=frac, coef2=frac, amp1=amp, amp2=amp)
                                for frac, amp in amplitudes]
-        __import__('ipdb').set_trace()
         self._phsp = [amp.decay_phasespace() for amp in amp_list]
         self._top_at_rest = tf.stack((0.0, 0.0, 0.0, ztf.to_real(top_particle_mass)), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
@@ -514,13 +513,9 @@ class Resonance:
         name = sanitize_string(name)
 
         def get_resonance_mass(mass_min, mass_max, n_events):
-            def factory(n_to_generate):
-                return mass_min(n_to_generate), mass_max(n_to_generate)
-
             space = zfit.core.sample.EventSpace(f'M({name})',
-                                                limits=(lambda lim: lim[0],
-                                                        lambda lim: lim[1]),
-                                                factory=factory)
+                                                limits=(((mass_min,),),
+                                                        ((mass_max),),))
             return tf.reshape(self._model(obs=space,
                                           name=f'BW({name})',
                                           **args).sample(n_events),
