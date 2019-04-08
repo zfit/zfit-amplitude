@@ -157,6 +157,8 @@ class HackSampleSumPDF(zfit.pdf.SumPDF):
         n_sample1 = tf.ceil(n * self.fracs[0])
         n_sample2 = n - n_sample1
         print("using sampling")
+        # HACK to use normal sampling
+        # raise NotImplementedError
         sample = tf.concat([pdf.sample(n=n, limits=limits)
                             for n, pdf in zip((n_sample1, n_sample2), self.pdfs)],
                            axis=0)
@@ -275,13 +277,13 @@ if __name__ == "__main__":
     limits = zfit.Space(obs=decay.obs, limits=(lower, upper))
 
     pdf = decay.pdf("Test")
-    pdf.update_integration_options(draws_per_dim=3000)
+    pdf.update_integration_options(draws_per_dim=300000)
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
     print("limits area", limits.area())
     zfit.settings.set_verbosity(6)
 
-    sample = pdf.sample(n=3000, limits=limits)
+    sample = pdf.sample(n=300000, limits=limits)
 
     sample_np = zfit.run(sample)
     print("Shape sample produced: {}".format(sample_np.shape))
