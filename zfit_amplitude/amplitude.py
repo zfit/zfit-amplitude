@@ -332,9 +332,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                 if part_name not in particles:
                     particles[part_name] = []
                 particles[part_name].append(gen_parts)
-        merged_particles = {part_name: tf.concat(part_list, axis=0)
+        merged_particles = {part_name: tf.concat(part_list, axis=1)
                             for part_name, part_list in particles.items()}
-        merged_weights = tf.concat(norm_weights, axis=0)
+        merged_weights = tf.concat(norm_weights, axis=1)
         thresholds = ztf.random_uniform(shape=(n_to_produce,))
         return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)
 

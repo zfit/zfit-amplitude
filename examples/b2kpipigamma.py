@@ -277,13 +277,13 @@ if __name__ == "__main__":
     limits = zfit.Space(obs=decay.obs, limits=(lower, upper))
 
     pdf = decay.pdf("Test")
-    pdf.update_integration_options(draws_per_dim=300000)
+    pdf.update_integration_options(draws_per_dim=3000)
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
     print("limits area", limits.area())
     zfit.settings.set_verbosity(6)
 
-    sample = pdf.sample(n=300000, limits=limits)
+    sample = pdf.sample(n=3000, limits=limits)
 
     sample_np = zfit.run(sample)
     print("Shape sample produced: {}".format(sample_np.shape))
