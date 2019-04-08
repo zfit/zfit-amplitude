@@ -42,7 +42,9 @@ V2KPI = (lp.Kst_892_0, lp.K_0st_1430_0, Particle.from_pdgid(225))
 # Mass functions
 def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
-        mass_min = tf.broadcast_to(mass_min, (n_events,))
+        print_op = tf.print("DEBUG: nevents:", n_events)
+        with tf.control_dependencies([print_op]):
+            mass_min = tf.broadcast_to(mass_min, (n_events,))
         mass_max = tf.broadcast_to(mass_max, (n_events,))
         bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
                                                                                       limits=(((mass_min,),), ((mass_max,),))),

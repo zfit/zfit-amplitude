@@ -335,7 +335,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                             for part_name, part_list in particles.items()}
         merged_weights = tf.concat(norm_weights, axis=0)
         thresholds = ztf.random_uniform(shape=tf.shape(merged_weights))
-        return merged_particles, thresholds, merged_weights, None, tf.cast(tf.reduce_sum(n_to_generate), dtype=tf.int64)
+        return merged_particles, thresholds, merged_weights, tf.reduce_max(merged_weights) * 0.0005, tf.cast(tf.reduce_sum(n_to_generate), dtype=tf.int64)
 
     def _do_transform(self, particle_dict):
         """Identity.
