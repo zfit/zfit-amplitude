@@ -318,8 +318,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         for amp in self._squared_terms:
             pseudo_yields.append(amp.integrate(limits=limits.get_subspace(amp.obs),
                                                norm_range=False))
-        sum_yields = sum(pseudo_yields)
-        n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / sum_yields)
+        n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / tf.reduce_sum(pseudo_yields))
                          for pseudo_yield in pseudo_yields]
 
         norm_weights = []
@@ -335,8 +334,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         merged_particles = {part_name: tf.concat(part_list, axis=1)
                             for part_name, part_list in particles.items()}
         merged_weights = tf.concat(norm_weights, axis=0)
-        thresholds = ztf.random_uniform(shape=(n_to_produce,))
-        return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)
+        thresholds = ztf.random_uniform(shape=tf.shape(merged_weights))
+        return merged_particles, thresholds, merged_weights, None, tf.cast(tf.reduce_sum(n_to_generate), dtype=tf.int64)
 
     def _do_transform(self, particle_dict):
         """Identity.
