@@ -55,8 +55,8 @@ def kres_mass(kres_mass, kres_width, dec_string):
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
-        bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.Space(f'Vres_mass({dec_string})',
-                                                               mass_min, mass_max),
+        bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Vres_mass({dec_string})',
+                                                                 limits=(((mass_min,),), ((mass_max,),))),
                                                 name=f'Vres_BW({dec_string})',
                                                 mres=vres_mass, wres=vres_width).sample(n_events)
         return tf.reshape(bw_v, (1, n_events))
