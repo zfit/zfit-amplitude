@@ -247,9 +247,9 @@ def generator_sample_and_weights_factory(self):
     def sample_and_weights(n_to_produce, limits, dtype=None):
         gen_parts, *output = self._do_sample(n_to_produce, limits)
         obs_vars = self._do_transform(gen_parts)
-        if set(obs_vars.keys()) != set(self._obs.obs):
-            raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self._obs.obs}")
-        obs_vars = tf.concat([obs_vars[obs] for obs in self._obs.obs], axis=1)
+        if set(obs_vars.keys()) != set(self.obs):
+            raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self.obs}")
+        obs_vars = tf.concat([obs_vars[obs] for obs in self.obs], axis=1)
         return tuple([obs_vars] + output)
 
     return sample_and_weights
@@ -332,8 +332,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                 if part_name not in particles:
                     particles[part_name] = []
                 particles[part_name].append(gen_parts)
-                merged_particles = {part_name: tf.concat(particles, axis=0)
-                                    for part_name, part_list in particles}
+                merged_particles = {part_name: tf.concat(part_list, axis=0)
+                                    for part_name, part_list in particles.items()}
         merged_weights = tf.concat(norm_weights, axis=0)
         thresholds = ztf.random_uniform(shape=(n_to_produce,))
         return merged_particles, thresholds, merged_weights, sum_yields, len(norm_weights)

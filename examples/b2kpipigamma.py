@@ -9,7 +9,7 @@
 
 import operator
 import functools
-from typing import Tuple, Optional
+from types import MethodType
 
 import yaml
 
@@ -17,9 +17,7 @@ from particle import Particle
 from particle.particle import literals as lp
 
 import zfit
-from zfit import ztf
 from zfit.core.parameter import Parameter, ComplexParameter
-from zfit.util import ztyping
 
 from zfit_amplitude.amplitude import Decay, Amplitude, SumAmplitudeSquaredPDF
 import zfit_amplitude.dynamics as dynamics
@@ -45,9 +43,9 @@ V2KPI = (lp.Kst_892_0, lp.K_0st_1430_0, Particle.from_pdgid(225))
 def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
         bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
-                                                                 limits=(((mass_min,),), ((mass_max,),))),
-                                                  name=f'Kres_BW({dec_string})',
-                                                  mres=kres_mass, wres=kres_width).sample(n_events)
+                                                                                      limits=(((mass_min,),), ((mass_max,),))),
+                                                      name=f'Kres_BW({dec_string})',
+                                                      mres=kres_mass, wres=kres_width).sample(n_events)
         return tf.reshape(bw_res, (1, n_events))
 
     return get_kres_mass
@@ -56,9 +54,9 @@ def kres_mass(kres_mass, kres_width, dec_string):
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
         bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Vres_mass({dec_string})',
-                                                                 limits=(((mass_min,),), ((mass_max,),))),
-                                                name=f'Vres_BW({dec_string})',
-                                                mres=vres_mass, wres=vres_width).sample(n_events)
+                                                                                    limits=(((mass_min,),), ((mass_max,),))),
+                                                    name=f'Vres_BW({dec_string})',
+                                                    mres=vres_mass, wres=vres_width).sample(n_events)
         return tf.reshape(bw_v, (1, n_events))
 
     return get_vres_mass
@@ -204,8 +202,17 @@ class Bp2KpipiGamma(Decay):
                                                    mod=a_i, arg=phi_i)
             amplitudes.append(amplitude)
             coeffs.append(fraction)
-        obs = self._build_obs(config.get('obs', {}))
-        super().__init__(obs, amplitudes, coeffs)
+        obs_def = config.get('obs', {})
+        obs = self._build_obs(obs_def)
+
+        def var_transf(self, particles):
+            return {tuple_name+tuple_comp: particles[phsp_name][comp_num]
+                    for phsp_name, tuple_name in obs_def.get('particle-names',
+                                                             Bp2KpipiGamma.DEFAULT_PARTICLE_NAMES).items()
+                    for comp_num, tuple_comp in enumerate(obs_def.get('component-names',
+                                                                      Bp2KpipiGamma.DEFAULT_COMPONENT_NAMES).values())}
+
+        super().__init__(obs, amplitudes, coeffs, variable_transformations=var_transf)
 
     @staticmethod
     def _build_obs(obs_def):
@@ -234,6 +241,12 @@ class Bp2KpipiGamma(Decay):
                                           coef_list=self._coeffs,
                                           top_particle_mass=self._amplitudes[0].top_particle_mass,
                                           amplitude_extra_config={'chirality': "L"})
+        if self._sampling_function:
+            right_pdf._do_sample = MethodType(self._sampling_function, right_pdf)
+            left_pdf._do_sample = MethodType(self._sampling_function, left_pdf)
+        if self._var_transforms:
+            right_pdf._do_transform = MethodType(self._var_transforms, right_pdf)
+            left_pdf._do_transform = MethodType(self._var_transforms, left_pdf)
         safe_lambda_gamma = tf.minimum(self.lambda_gamma, 1.)
         return HackSampleSumPDF([right_pdf, left_pdf], [((1 + safe_lambda_gamma) / 2)], name="Sum_L_R")
 
