@@ -42,6 +42,8 @@ V2KPI = (lp.Kst_892_0, lp.K_0st_1430_0, Particle.from_pdgid(225))
 # Mass functions
 def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
+        mass_min = tf.broadcast_to(mass_min, (n_events,))
+        mass_max = tf.broadcast_to(mass_max, (n_events,))
         bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
                                                                                       limits=(((mass_min,),), ((mass_max,),))),
                                                       name=f'Kres_BW({dec_string})',
@@ -53,6 +55,8 @@ def kres_mass(kres_mass, kres_width, dec_string):
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
+        mass_min = tf.broadcast_to(mass_min, (n_events,))
+        mass_max = tf.broadcast_to(mass_max, (n_events,))
         bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Vres_mass({dec_string})',
                                                                                     limits=(((mass_min,),), ((mass_max,),))),
                                                     name=f'Vres_BW({dec_string})',
@@ -254,6 +258,9 @@ class Bp2KpipiGamma(Decay):
 if __name__ == "__main__":
     import tensorflow as tf
     import platform
+    import zfit
+
+    zfit.settings.set_verbosity(6)
 
     if platform.system() == 'Darwin':
         import matplotlib
