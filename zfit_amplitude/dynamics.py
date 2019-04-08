@@ -10,6 +10,7 @@
 import tensorflow as tf
 
 import zfit
+from numpy.core._multiarray_umath import dtype
 from zfit import ztf
 
 import zfit_amplitude.kinematics as kinematics
@@ -49,10 +50,16 @@ def relativistic_breit_wigner(m2, mres, wres):
 # relativistic_breit_wigner = make_func(func=relativistic_breit_wigner, params=['mres', 'wres'])
 
 class RelativisticBreitWigner(zfit.func.BaseFunc):
-    def __init__(self, obs, name, mres, wres, using_m_squared=False):
+    def __init__(self, obs, name, mres, wres, using_m_squared=False, dtype=zfit.settings.ztypes.complex):
         self.using_m_squared = using_m_squared
-        super().__init__(obs=obs, name=name, dtype=zfit.settings.ztypes.complex,
+        # HACK to make it usable in while loop
+        zfit.run._enable_parameter_autoconversion = False
+
+        super().__init__(obs=obs, name=name, dtype=dtype,
                          params={'mres': mres, 'wres': mres})
+
+        zfit.run._enable_parameter_autoconversion = True
+        # HACK end
 
     def _func(self, x):
         var = ztf.unstack_x(x)
@@ -68,6 +75,16 @@ class RelativisticBreitWigner(zfit.func.BaseFunc):
         mres = self.params['mres']
         wres = self.params['wres']
         return relativistic_breit_wigner(m_sq, mres, wres)
+
+
+class RelativisticBreitWignerReal(RelativisticBreitWigner):
+
+
+    def __init__(self, obs, name, mres, wres, using_m_squared=False):
+        super().__init__(obs, name, mres, wres, using_m_squared, dtype=zfit.settings.ztypes.float)
+
+    def _func(self, x):
+        return ztf.to_real(super()._func(x))
 
 
 def blatt_weisskopf_ff(q, q0, d, l):
@@ -168,6 +185,7 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
             md0 = self.params['md0']
             return breit_wigner_line_shape(m_sq, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld,
                                            self.barrier_factor, ma0, md0)
+
         return ztf.run_no_nan(func=func, x=x)
 
 

@@ -44,18 +44,18 @@ V2KPI = (lp.Kst_892_0, lp.K_0st_1430_0, Particle.from_pdgid(225))
 # Mass functions
 def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
-        bw_res = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'Kres_mass({dec_string})',
-                                                                 mass_min, mass_max),
+        bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
+                                                                 limits=(((mass_min,),), ((mass_max,),))),
                                                   name=f'Kres_BW({dec_string})',
                                                   mres=kres_mass, wres=kres_width).sample(n_events)
-        return tf.reshape(bw_res, 1, n_events)
+        return tf.reshape(bw_res, (1, n_events))
 
     return get_kres_mass
 
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
-        bw_v = dynamics.RelativisticBreitWigner(obs=zfit.Space(f'Vres_mass({dec_string})',
+        bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.Space(f'Vres_mass({dec_string})',
                                                                mass_min, mass_max),
                                                 name=f'Vres_BW({dec_string})',
                                                 mres=vres_mass, wres=vres_width).sample(n_events)
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     limits = zfit.Space(obs=decay.obs, limits=(lower, upper))
 
     pdf = decay.pdf("Test")
-    pdf.update_integration_options(draws_per_dim=300000)
+    pdf.update_integration_options(draws_per_dim=3000)
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
     print("limits area", limits.area())

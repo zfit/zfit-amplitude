@@ -290,8 +290,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                  **kwargs):  # noqa
         self._external_integral = external_integral
         amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
-        amplitudes = [(frac, amp.amplitude(obs, **amp_extra_config))
-                      for frac, amp in zip(coef_list, amp_list)]
+        amplitudes = [(frac,  amp.amplitude(obs, **amp_extra_config))
+                            for frac, amp in zip(coef_list, amp_list)]
         self._cross_terms = [amplitude_product_class(coef1=frac1, coef2=frac2, amp1=amp1, amp2=amp2)
                              for (frac1, amp1), (frac2, amp2) in combinations(amplitudes, 2)]
         self._squared_terms = [amplitude_product_class(coef1=frac, coef2=frac, amp1=amp, amp2=amp)
@@ -355,10 +355,10 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
             integral = self._external_integral(limits=limits, norm_range=norm_range)
         else:
             integral = tf.reduce_sum([2. * amp.integrate(limits=limits, norm_range=norm_range)
-                                      for amp in self._amplitudes_cross_terms] +
+                for amp in self._amplitudes_cross_terms] +
                                      [amp.integrate(limits=limits, norm_range=norm_range)
-                                      for amp in self._squared_terms],
-                                     axis=0)
+                 for amp in self._squared_terms],
+                axis=0)
             integral = ztf.to_real(integral)
         return integral
 
@@ -519,7 +519,7 @@ class Resonance:
         def get_resonance_mass(mass_min, mass_max, n_events):
             space = zfit.core.sample.EventSpace(f'M({name})',
                                                 limits=(((mass_min,),),
-                                                        ((mass_max),),))
+                                                        ((mass_max,),),))
             return tf.reshape(self._model(obs=space,
                                           name=f'BW({name})',
                                           **args).sample(n_events),
