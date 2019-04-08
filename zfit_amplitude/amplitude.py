@@ -231,7 +231,7 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
         prod_real, prod_imag = self.funcs
 
         def func(x):
-            return ztf.to_real(self.coeff_prod * ztf.complex(prod_real(x), prod_imag(x)))
+            return ztf.to_real(self.coeff_prod * ztf.complex(prod_real.func(x), prod_imag.func(x)))
 
         return ztf.run_no_nan(func=func, x=x)
 
@@ -249,7 +249,7 @@ def generator_sample_and_weights_factory(self):
         obs_vars = self._do_transform(gen_parts)
         if set(obs_vars.keys()) != set(self.obs):
             raise ValueError(f"The obs_vars keys {obs_vars.keys()} do not match the observables {self.obs}")
-        obs_vars = tf.concat([obs_vars[obs] for obs in self.obs], axis=1)
+        obs_vars = tf.stack([obs_vars[obs] for obs in self.obs], axis=1)
         return tuple([obs_vars] + output)
 
     return sample_and_weights
@@ -304,7 +304,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
 
     def _unnormalized_pdf(self, x):
         def unnormalized_pdf_func(x):
-            value = tf.reduce_sum([2. * amp.func(x=x) for amp in self._amplitudes_cross_terms] +
+            value = tf.reduce_sum([2. * amp.func(x=x) for amp in self._cross_terms] +
                                   [amp.func(x=x) for amp in self._squared_terms],
                                   axis=0)
             return ztf.to_real(value)
@@ -355,7 +355,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
             integral = self._external_integral(limits=limits, norm_range=norm_range)
         else:
             integral = tf.reduce_sum([2. * amp.integrate(limits=limits, norm_range=norm_range)
-                for amp in self._amplitudes_cross_terms] +
+                for amp in self._cross_terms] +
                                      [amp.integrate(limits=limits, norm_range=norm_range)
                  for amp in self._squared_terms],
                 axis=0)
