@@ -45,11 +45,11 @@ def kres_mass(kres_mass, kres_width, dec_string):
         print_op = tf.print("DEBUG: nevents:", n_events)
         with tf.control_dependencies([print_op]):
             mass_min = tf.broadcast_to(mass_min, (n_events,))
-        mass_max = tf.broadcast_to(mass_max, (n_events,))
-        bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
-                                                                                      limits=(((mass_min,),), ((mass_max,),))),
-                                                      name=f'Kres_BW({dec_string})',
-                                                      mres=kres_mass, wres=kres_width).sample(n_events)
+            mass_max = tf.broadcast_to(mass_max, (n_events,))
+            bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
+                                                                                          limits=(((mass_min,),), ((mass_max,),))),
+                                                          name=f'Kres_BW({dec_string})',
+                                                          mres=kres_mass, wres=kres_width).sample(n_events)
         return tf.reshape(bw_res, (1, n_events))
 
     return get_kres_mass
@@ -304,6 +304,7 @@ if __name__ == "__main__":
     plt.show()
     nll = zfit.loss.UnbinnedNLL(model=pdf, data=sample, fit_range=limits)
     minimizer = zfit.minimize.MinuitMinimizer(verbosity=10)
+    minimizer._use_tfgrad = False  # no analytic gradient, may has bugs in it
     for param in nll.get_dependents():
         param.load(0.8)
     result = minimizer.minimize(loss=nll)
