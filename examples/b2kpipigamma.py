@@ -287,17 +287,23 @@ if __name__ == "__main__":
     print("limits area", limits.area())
     zfit.settings.set_verbosity(6)
 
-    sample = pdf.sample(n=3000, limits=limits)
-    #branches_alias = {"_0_B#_E":}
-    #sample = zfit.Data.from_root(path="kpipigamma_rest.root", treepath="DalitzEventList",
-    #                             branches=)
+    sampler = pdf.create_sampler(n=3000, limits=limits)
+    obs_particles = list(Bp2KpipiGamma.DEFAULT_PARTICLE_NAMES[particle] for particle in ('K+', 'pi-', 'pi+', 'gamma'))
+    branches_particles = list(particle for particle in ('_1_K#', '_2_pi#', '_3_pi~', '_4_gamma0'))
+    obs_component = ['x', 'y', 'z', 'e']
+    branches_component = ["_Px", "_Py", "_Pz", "_E"]
+    obs_names = [particle + component for component in obs_component for particle in obs_particles]
+    branch_names = [particle + component for component in branches_component for particle in branches_particles]
+    branches_alias = {branch_name: obs_name for branch_name, obs_name in zip(branch_names, obs_names)}
+    # sampler = zfit.Data.from_root(path="kpipigamma_rest.root", treepath="DalitzEventList",
+    #                              branches_alias=branches_alias)
 
-    sample_np = zfit.run(sample)
-    print("Shape sample produced: {}".format(sample_np.shape))
-    for i, obs in enumerate(sample.obs):
-        plt.figure()
-        plt.title(obs)
-        plt.hist(sample_np[:, i], bins=35)
+    #sample_np = zfit.run(sampler)
+    #print("Shape sample produced: {}".format(sample_np.shape))
+    #for i, obs in enumerate(sampler.obs):
+    #    plt.figure()
+    #    plt.title(obs)
+    #    plt.hist(sample_np[:, i], bins=35)
     # plt.title(sample.obs[1])
     # plt.hist(zfit.run(sample)[:, 1])
     # plt.figure()
@@ -306,8 +312,9 @@ if __name__ == "__main__":
     # plt.figure()
     # plt.title(sample.obs[3])
     # plt.hist(zfit.run(sample)[:, 3])
-    plt.show()
-    nll = zfit.loss.UnbinnedNLL(model=pdf, data=sample, fit_range=limits)
+    # plt.show()
+    sampler.resample()
+    nll = zfit.loss.UnbinnedNLL(model=pdf, data=sampler, fit_range=limits)
     minimizer = zfit.minimize.MinuitMinimizer(verbosity=10)
     minimizer._use_tfgrad = False  # no analytic gradient, may has bugs in it
     for param in nll.get_dependents():
