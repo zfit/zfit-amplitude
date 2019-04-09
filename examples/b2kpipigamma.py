@@ -44,6 +44,7 @@ def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
         print_op = tf.print("DEBUG: nevents:", n_events)
         with tf.control_dependencies([print_op]):
+            # HACK broadcast mass min max to nevents. Why can mass be 1 and nevents not?
             #mass_min = tf.broadcast_to(mass_min, (n_events,))
             #mass_max = tf.broadcast_to(mass_max, (n_events,))
             bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
@@ -57,6 +58,7 @@ def kres_mass(kres_mass, kres_width, dec_string):
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
+        # HACK broadcast mass min max to nevents. Why can mass be 1 and nevents not?
         #mass_min = tf.broadcast_to(mass_min, (n_events,))
         #mass_max = tf.broadcast_to(mass_max, (n_events,))
         bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Vres_mass({dec_string})',
