@@ -44,8 +44,8 @@ def kres_mass(kres_mass, kres_width, dec_string):
     def get_kres_mass(mass_min, mass_max, n_events):
         print_op = tf.print("DEBUG: nevents:", n_events)
         with tf.control_dependencies([print_op]):
-            mass_min = tf.broadcast_to(mass_min, (n_events,))
-            mass_max = tf.broadcast_to(mass_max, (n_events,))
+            #mass_min = tf.broadcast_to(mass_min, (n_events,))
+            #mass_max = tf.broadcast_to(mass_max, (n_events,))
             bw_res = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Kres_mass({dec_string})',
                                                                                           limits=(((mass_min,),), ((mass_max,),))),
                                                           name=f'Kres_BW({dec_string})',
@@ -57,8 +57,8 @@ def kres_mass(kres_mass, kres_width, dec_string):
 
 def vres_mass(vres_mass, vres_width, dec_string):
     def get_vres_mass(mass_min, mass_max, n_events):
-        mass_min = tf.broadcast_to(mass_min, (n_events,))
-        mass_max = tf.broadcast_to(mass_max, (n_events,))
+        #mass_min = tf.broadcast_to(mass_min, (n_events,))
+        #mass_max = tf.broadcast_to(mass_max, (n_events,))
         bw_v = dynamics.RelativisticBreitWignerReal(obs=zfit.core.sample.EventSpace(f'Vres_mass({dec_string})',
                                                                                     limits=(((mass_min,),), ((mass_max,),))),
                                                     name=f'Vres_BW({dec_string})',
@@ -286,6 +286,9 @@ if __name__ == "__main__":
     zfit.settings.set_verbosity(6)
 
     sample = pdf.sample(n=3000, limits=limits)
+    #branches_alias = {"_0_B#_E":}
+    #sample = zfit.Data.from_root(path="kpipigamma_rest.root", treepath="DalitzEventList",
+    #                             branches=)
 
     sample_np = zfit.run(sample)
     print("Shape sample produced: {}".format(sample_np.shape))
