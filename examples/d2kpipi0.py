@@ -29,17 +29,17 @@ D_ZERO = lp.D_0
 
 
 RESONANCES = {'rho(770)': ('m2pipi', Resonance(lp.rho_770_plus,
-                                               dynamics.RelativisticBreitWigner)),
+                                               dynamics.RelativisticBreitWignerReal)),
               'K2*(1430)0': ('m2kpim', Resonance(Particle.from_string('K(2)*(1430)'),
-                                                 dynamics.RelativisticBreitWigner)),
+                                                 dynamics.RelativisticBreitWignerReal)),
               'K0*(1430)+': ('m2kpi0', Resonance(lp.K_0st_1430_plus,
-                                                 dynamics.RelativisticBreitWigner)),
+                                                 dynamics.RelativisticBreitWignerReal)),
               'K*(892)+': ('m2kpi0', Resonance(lp.Kst_892_plus,
-                                               dynamics.RelativisticBreitWigner)),
+                                               dynamics.RelativisticBreitWignerReal)),
               'K0*(1430)0': ('m2kpim', Resonance(lp.K_0st_1430_0,
-                                                 dynamics.RelativisticBreitWigner)),
+                                                 dynamics.RelativisticBreitWignerReal)),
               'K*(892)0': ('m2kpim', Resonance(lp.Kst_892_0,
-                                               dynamics.RelativisticBreitWigner))}
+                                               dynamics.RelativisticBreitWignerReal))}
 
 COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
           'K2*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
@@ -92,7 +92,7 @@ class D2Kpipi0Amplitude(Amplitude):
                                         mres=self.resonance.mass, wres=self.resonance.width, using_m_squared=True)
 
 
-def var_transformation(particles):
+def var_transformation(self, particles):
     """Transform particles to our observables of interest."""
     return {'m2kpim': kinematics.mass_squared(particles['K+']+particles['pi-']),
             'm2kpi0': kinematics.mass_squared(particles['K+']+particles['pi0']),
@@ -117,6 +117,7 @@ if __name__ == "__main__":
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
-    pdf.sample(10)
+    sample = pdf.sample(1000)
+    sample_np = zfit.run(sample)
 
 # EOF

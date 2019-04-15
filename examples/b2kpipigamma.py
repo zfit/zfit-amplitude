@@ -17,6 +17,7 @@ from particle import Particle
 from particle.particle import literals as lp
 
 import zfit
+from zfit import ztf
 from zfit.core.parameter import Parameter, ComplexParameter
 
 from zfit_amplitude.amplitude import Decay, Amplitude, SumAmplitudeSquaredPDF
@@ -158,7 +159,7 @@ class HackSampleSumPDF(zfit.pdf.SumPDF):
         # assuming only sum of 2 pdfs
         if len(self.pdfs) > 2 or self.is_extended:
             raise RuntimeError("This is a simple adhoc example, only use with 2 pdfs and non-extended.")
-        n_sample1 = tf.ceil(n * self.fracs[0])
+        n_sample1 = tf.ceil(ztf.to_real(n) * self.fracs[0])
         n_sample2 = n - n_sample1
         print("using sampling")
         # HACK to use normal sampling
@@ -318,6 +319,7 @@ if __name__ == "__main__":
     minimizer = zfit.minimize.MinuitMinimizer(verbosity=10)
     minimizer._use_tfgrad = False  # no analytic gradient, may has bugs in it
     for param in nll.get_dependents():
+        print(f"param {param.name} = {zfit.run(param)}")
         param.load(0.8)
     result = minimizer.minimize(loss=nll)
     print(result.fmin)
