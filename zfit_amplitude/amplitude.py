@@ -144,7 +144,7 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
         self.projector = projector
         super().__init__(funcs=[amp1, amp2], name=name, obs=None, **kwargs)
         integral_holder = tf.Variable(initial_value=-42, trainable=False,
-                                          dtype=self.dtype, use_resource=True)
+                                      dtype=self.dtype, use_resource=True)
         # self.sess.run(integral_holder.initializer)
         self._product_cache_integral_holder = integral_holder
 
@@ -290,8 +290,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                  **kwargs):  # noqa
         self._external_integral = external_integral
         amp_extra_config = amplitude_extra_config if amplitude_extra_config else {}
-        amplitudes = [(frac,  amp.amplitude(obs, **amp_extra_config))
-                            for frac, amp in zip(coef_list, amp_list)]
+        amplitudes = [(frac, amp.amplitude(obs, **amp_extra_config))
+                      for frac, amp in zip(coef_list, amp_list)]
         self._cross_terms = [amplitude_product_class(coef1=frac1, coef2=frac2, amp1=amp1, amp2=amp2)
                              for (frac1, amp1), (frac2, amp2) in combinations(amplitudes, 2)]
         self._squared_terms = [amplitude_product_class(coef1=frac, coef2=frac, amp1=amp, amp2=amp)
@@ -335,8 +335,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                             for part_name, part_list in particles.items()}
         merged_weights = tf.concat(norm_weights, axis=0)
         thresholds = ztf.random_uniform(shape=tf.shape(merged_weights))
-        # TODO(Mayou36): remove inefficient low weights, do a real comparison in zfit
-        return merged_particles, thresholds, merged_weights, tf.reduce_max(merged_weights) * 0.0005, tf.cast(tf.reduce_sum(n_to_generate), dtype=tf.int64)
+        return merged_particles, thresholds, merged_weights, None, tf.cast(tf.reduce_sum(n_to_generate), dtype=tf.int64)
 
     def _do_transform(self, particle_dict):
         """Identity.
@@ -355,10 +354,10 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
             integral = self._external_integral(limits=limits, norm_range=norm_range)
         else:
             integral = tf.reduce_sum([2. * amp.integrate(limits=limits, norm_range=norm_range)
-                for amp in self._cross_terms] +
+                                      for amp in self._cross_terms] +
                                      [amp.integrate(limits=limits, norm_range=norm_range)
-                 for amp in self._squared_terms],
-                axis=0)
+                                      for amp in self._squared_terms],
+                                     axis=0)
             integral = ztf.to_real(integral)
         return integral
 
@@ -517,6 +516,10 @@ class Resonance:
         name = sanitize_string(name)
 
         def get_resonance_mass(mass_min, mass_max, n_events):
+            if mass_min.shape.as_list() == [1]:
+                mass_min = tf.broadcast_to(mass_min, (n_events,))
+            if mass_max.shape.as_list() == [1]:
+                mass_max = tf.broadcast_to(mass_max, (n_events,))
             space = zfit.core.sample.EventSpace(f'M({name})',
                                                 limits=(((mass_min,),),
                                                         ((mass_max,),),))

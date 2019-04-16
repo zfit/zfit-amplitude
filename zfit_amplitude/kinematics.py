@@ -109,7 +109,7 @@ def scalar(x):
 
 def mass_squared(vector):
     """Calculate the squared mass for a Lorentz 4-momentum."""
-    return tf.reduce_sum(tf.transpose(vector * vector) * tf.reshape(metric_tensor(), (4,1)), axis=0)
+    return tf.reduce_sum(vector * vector * tf.reshape(metric_tensor(), (4, 1)), axis=0)
 
 
 def mass(vector):

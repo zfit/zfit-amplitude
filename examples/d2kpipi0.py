@@ -96,10 +96,11 @@ def var_transformation(self, particles):
     """Transform particles to our observables of interest."""
     return {'m2kpim': kinematics.mass_squared(particles['K+']+particles['pi-']),
             'm2kpi0': kinematics.mass_squared(particles['K+']+particles['pi0']),
-            'm2pipi': kinematics.mass_squared(particles['pi-']+particles['pi-'])}
+            'm2pipi': kinematics.mass_squared(particles['pi-']+particles['pi0'])}
 
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     m2kpim = zfit.Space(obs='m2kpim',
                         limits=((K_PLUS.mass + PI_MINUS.mass)**2, (D_ZERO.mass - PI_ZERO.mass)**2))
     m2kpiz = zfit.Space(obs='m2kpi0',
@@ -117,7 +118,16 @@ if __name__ == "__main__":
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
-    sample = pdf.sample(1000)
+    sample = pdf.sample(8000)
     sample_np = zfit.run(sample)
+    for axis1, axis2 in ((0, 1), (1, 2), (2, 0)):
+        obs1 = pdf.obs[axis1]
+        obs2 = pdf.obs[axis2]
+        plt.figure()
+        plt.title(f"Dalitz plot D0->K+pi-pi0 of {obs1}:{obs2}")
+        plt.scatter(sample_np[:, axis1], sample_np[:, axis2], s=0.15)
+        plt.xlabel(obs1)
+        plt.ylabel(obs2)
+    plt.show()
 
 # EOF
