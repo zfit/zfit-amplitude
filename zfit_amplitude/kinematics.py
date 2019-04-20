@@ -96,7 +96,7 @@ def scalar_product(vec1, vec2):
     """
     Calculate scalar product of two 3-vectors
     """
-    return tf.reduce_sum(vec1 * vec2, 1)
+    return tf.reduce_sum(vec1 * vec2, axis=1)
 
 
 def scalar(x):
@@ -109,7 +109,8 @@ def scalar(x):
 
 def mass_squared(vector):
     """Calculate the squared mass for a Lorentz 4-momentum."""
-    return tf.reduce_sum(vector * vector * tf.reshape(metric_tensor(), (4, 1)), axis=0)
+    # TODO: which format?
+    return tf.reduce_sum(vector * vector * metric_tensor(), axis=1)
 
 
 def mass(vector):
