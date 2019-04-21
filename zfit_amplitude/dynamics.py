@@ -21,7 +21,8 @@ def relativistic_breit_wigner(m2, mres, wres):
     Relativistic Breit-Wigner
     """
     # TODO: Check complex
-    below_div = (ztf.to_complex(mres ** 2 - m2) - tf.complex(ztf.constant(0.), mres) * ztf.to_complex(wres))
+    second_part = tf.complex(ztf.constant(0.), mres) * ztf.to_complex(wres)
+    below_div = ztf.to_complex(mres ** 2 - m2) - second_part
     # real_part = tf.real(below_div)
     # imag_part = tf.imag(below_div)
     # result = tf.complex(1. / real_part, 1. / imag_part)
@@ -56,7 +57,7 @@ class RelativisticBreitWigner(zfit.func.BaseFunc):
         zfit.run._enable_parameter_autoconversion = False
 
         super().__init__(obs=obs, name=name, dtype=dtype,
-                         params={'mres': mres, 'wres': mres})
+                         params={'mres': mres, 'wres': wres})
 
         zfit.run._enable_parameter_autoconversion = True
         # HACK end

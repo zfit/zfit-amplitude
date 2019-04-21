@@ -55,11 +55,11 @@ class Decay:
         self._var_transforms = variable_transformations
 
     def add_amplitude(self, amplitude, coeff):
-        """Add amplitude and its correspondig coefficient.
+        """Add amplitude and its corresponding coefficient.
 
         Arguments:
             amplitude (:py:class:`Amplitude`): Amplitude to add.
-            coeff (:py:class:~zfit.core.parameter.Parameter): Coefficient corresponding
+            coeff (:py:class:`~zfit.Parameter`): Coefficient corresponding
                 to the amplitude.
 
         Return:
@@ -143,9 +143,9 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
                  **kwargs):  # noqa: W107
         self.projector = projector
         super().__init__(funcs=[amp1, amp2], name=name, obs=None, **kwargs)
-        integral_holder = tf.Variable(initial_value=-42, trainable=False,
+        integral_holder = tf.Variable(name=f"integral_cache_{name}", initial_value=-1e12, trainable=False,
                                       dtype=self.dtype, use_resource=True)
-        # self.sess.run(integral_holder.initializer)
+        self.sess.run(integral_holder.initializer)
         self._product_cache_integral_holder = integral_holder
 
     def _func(self, x):
@@ -157,25 +157,32 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
         return ztf.run_no_nan(func=func, x=x)
 
     def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
-        integral = self._cache.get("integral")
+        # HACK no caching
+        # return super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+        # HACK to check variable
+        # integral = self._cache.get("integral")
+        integral = None
         if integral is None:
             self._cache['integral'] = {}
+        # TODO(Mayou36): smart integral caching, one variable?
 
         # safer version
-        if integral is not None:
-            integral = integral.get((limits, norm_range))
+        # if integral is not None:
+        #     integral = integral.get((limits, norm_range))
         # safer version end
 
         if integral is None:
-            integral = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+            integral_tensor = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
             integral_holder = self._product_cache_integral_holder
-            assign_integral_op = integral_holder.assign(value=integral)
-            # self._cache['integral'] = integral_holder
+            assign_integral_op = integral_holder.assign(value=integral_tensor)
+            # TODO(Mayou36): fix integral cache, don't store holder, store value
+            self._cache['integral'] = integral_holder
             # safer version
-            self._cache['integral'][(limits, norm_range)] = integral_holder
+            # self._cache['integral'][(limits, norm_range)] = integral_holder
             # safer version end
+            # with tf.control_dependencies([integral_holder.initializer]):
             with tf.control_dependencies([assign_integral_op]):
-                integral = tf.identity(integral_holder)
+                integral = integral_holder.read_value()
 
         return integral
 
@@ -282,6 +289,7 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         to build the two-amplitude products. It defaults to :py:class:`AmplitudeProductCached`.
 
     """
+    _hack_use_default_sampling = False
 
     def __init__(self, obs, amp_list, coef_list, top_particle_mass,
                  name="SumAmplitudeSquaredPDF", external_integral=None,
@@ -299,8 +307,10 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         self._phsp = [amp.decay_phasespace() for amp in amp_list]
         self._top_at_rest = tf.stack((0.0, 0.0, 0.0, ztf.to_real(top_particle_mass)), axis=-1)
         super().__init__(obs=obs, name=name, params={coef.name: coef for coef in coef_list}, **kwargs)
-        self.update_integration_options(draws_per_dim=300000)
-        self._sample_and_weights = MethodType(generator_sample_and_weights_factory, self)
+        self.update_integration_options(draws_per_dim=30000)
+        # HACK: to do default accept reject with uniform sampling
+        if not self._hack_use_default_sampling:
+            self._sample_and_weights = MethodType(generator_sample_and_weights_factory, self)
 
     def _unnormalized_pdf(self, x):
         def unnormalized_pdf_func(x):
@@ -309,7 +319,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
                                   axis=0)
             return ztf.to_real(value)
 
-        result = ztf.run_no_nan(unnormalized_pdf_func, x)
+        # result = ztf.run_no_nan(unnormalized_pdf_func, x)
+        result = unnormalized_pdf_func(x)
         return result
 
     def _do_sample(self, n_to_produce, limits):
@@ -353,9 +364,9 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         if external_integral is not None:
             integral = self._external_integral(limits=limits, norm_range=norm_range)
         else:
-            integral = tf.reduce_sum([2. * amp.integrate(limits=limits, norm_range=norm_range)
+            integral = tf.reduce_sum([2. * amp.integrate(limits=limits.get_subspace(amp.obs), norm_range=False)
                                       for amp in self._cross_terms] +
-                                     [amp.integrate(limits=limits, norm_range=norm_range)
+                                     [amp.integrate(limits=limits.get_subspace(amp.obs), norm_range=False)
                                       for amp in self._squared_terms],
                                      axis=0)
             integral = ztf.to_real(integral)
@@ -378,8 +389,9 @@ class Amplitude:
     """
 
     def __init__(self, decay_tree):  # noqa: W107
+        decay_tree = tuple(decay_tree)  # input validation, to make sure it's immutable
         if len(decay_tree) != 3:
-            raise KeyError("Badly specified decay tree")
+            raise KeyError("Badly specified decay tree, length has to be 3.")
         self._decay_tree = decay_tree
         self._top_mass = decay_tree[1]
 
@@ -413,7 +425,7 @@ class Amplitude:
         """Get a decay string.
 
         Arguments:
-            sanitize (bool, optional): Sanitize to conform to tensorflow variable names.
+            sanitize (bool, optional): Sanitize to conform to TensorFlow variable names.
 
         Return:
             str
@@ -494,9 +506,9 @@ class Resonance:
             :py:class:`~zfit.func.BaseFunc`
 
         """
-        args = self._model_config.copy()
-        args.update(extra_args)
-        return self._model(obs=obs, name=sanitize_string(name), **args)
+        kwargs = self._model_config.copy()
+        kwargs.update(extra_args)
+        return self._model(obs=obs, name=sanitize_string(name), **kwargs)
 
     def mass_sampler(self, name='', **extra_args):
         """Get mass sampler to use for phasespace generation.
