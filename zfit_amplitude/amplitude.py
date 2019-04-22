@@ -154,11 +154,12 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
         def func(x):
             return self.projector(amp1.func(x) * tf.math.conj(amp2.func(x)))
 
-        return ztf.run_no_nan(func=func, x=x)
+        # return ztf.run_no_nan(func=func, x=x)
+        return func(x)
 
     def _single_hook_integrate(self, limits, norm_range, name='_hook_integrate'):
         # HACK no caching
-        # return super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
+        return super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
         # HACK to check variable
         # integral = self._cache.get("integral")
         integral = None
@@ -175,7 +176,7 @@ class AmplitudeProductProjectionCached(BaseFunctorFunc, SessionHolderMixin):
             integral_tensor = super()._single_hook_integrate(limits=limits, norm_range=norm_range, name=name)
             integral_holder = self._product_cache_integral_holder
             assign_integral_op = integral_holder.assign(value=integral_tensor)
-            # TODO(Mayou36): fix integral cache, don't store holder, store value
+            # TODO(Mayou36): fix integral cache, don't store holder, store value (after control_deps)
             self._cache['integral'] = integral_holder
             # safer version
             # self._cache['integral'][(limits, norm_range)] = integral_holder
@@ -202,14 +203,14 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
 
         PDF = \\sum_i a_i^2 A_i^2 + 2\\Re(a_1 a_2^* A_1A_2^*) + 2\\Re(a_1 a_3^* A_1A_3^*) + ...
 
-    Since the terms non-crossed terms don't have an imaginary part, if we forget about the
+    Since the non-crossed terms don't have an imaginary part, if we forget about the
     factors of 2 we can build each term as
 
     .. math::
 
         \\Re(a_1 a_2^*A_1A_2^*)
 
-    This function does precisely rhis calculation, and caches the integral of the A_1A_2^* part
+    This function does precisely this calculation, and caches the integral of the :math:`A_1A_2^*` part
     to save computation time.
 
     Note:
@@ -240,7 +241,8 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
         def func(x):
             return ztf.to_real(self.coeff_prod * ztf.complex(prod_real.func(x), prod_imag.func(x)))
 
-        return ztf.run_no_nan(func=func, x=x)
+        return func(x)
+        # return ztf.run_no_nan(func=func, x=x)
 
     @zfit.supports()
     def _integrate(self, limits, norm_range, name='_integrate'):

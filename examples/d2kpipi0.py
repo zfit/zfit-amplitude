@@ -14,6 +14,7 @@ from particle.particle import literals as lp
 from particle import Particle
 
 import zfit
+from zfit import ztf
 
 from zfit_amplitude.amplitude import Decay, Amplitude, Resonance, SumAmplitudeSquaredPDF
 import zfit_amplitude.dynamics as dynamics
@@ -33,13 +34,13 @@ RESONANCES = {
     # 'K0*(1430)+': ('m2kpi0', Resonance(lp.K_0st_1430_plus,dynamics.RelativisticBreitWignerReal)),
     'K*(892)+': ('m2kpi0', Resonance(lp.Kst_892_plus, dynamics.RelativisticBreitWignerReal)),
     # 'K0*(1430)0': ('m2kpim', Resonance(lp.K_0st_1430_0, dynamics.RelativisticBreitWignerReal)),
-    'K*(892)0': ('m2kpim', Resonance(lp.Kst_892_0,dynamics.RelativisticBreitWignerReal))
+    # 'K*(892)0': ('m2kpim', Resonance(lp.Kst_892_0, dynamics.RelativisticBreitWignerReal))
 }
 
 COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
           'K2*(1430)0': polar_param('f_K2star1430_0', 0.088, radians(-17.2)),
           'K0*(1430)+': polar_param('f_K0star1430_plus', 6.78, radians(69.1)),
-          'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-171)),
+          'K*(892)+': polar_param('f_Kstar892_plus', 0.899, radians(-17.1)),  # TODO: 171 or 17.1?
           'K0*(1430)0': polar_param('f_K0star1430_0', 1.65, radians(-44.4)),
           'K*(892)0': polar_param('f_Kstar892_0', 0.398, radians(24.1))}
 
@@ -101,8 +102,7 @@ if __name__ == "__main__":
 
     zfit.settings.set_verbosity(6)
     # HACK to use default uniform sampling in accept reject
-    SumAmplitudeSquaredPDF._hack_use_default_sampling = True
-
+    # SumAmplitudeSquaredPDF._hack_use_default_sampling = True
 
     m2kpim = zfit.Space(obs='m2kpim',
                         limits=((K_PLUS.mass + PI_MINUS.mass) ** 2, (D_ZERO.mass - PI_ZERO.mass) ** 2))
@@ -124,6 +124,11 @@ if __name__ == "__main__":
     integral = pdf.integrate(limits=masses)
     integral = zfit.run(integral)
     print(f"Integral (should be 1): {integral}")
+    x = ztf.random_uniform(shape=(20000, 3), minval=masses.lower[0], maxval=masses.upper[0])
+
+    probs = pdf.pdf(x=x)
+    x_np, probs_np = zfit.run([x, probs])
+    x_np /= (1000 ** 2)
     sample = pdf.sample(20000)
     sample_np = zfit.run(sample) / (1000 ** 2)  # from MeV^2 to GeV^2
     for axis1, axis2 in ((0, 1), (1, 2), (2, 0)):
@@ -141,6 +146,12 @@ if __name__ == "__main__":
         plt.title(f"Histogram of {obs}")
         plt.ylabel(f"counts")
         plt.xlabel(f"{obs}")
+
+        plt.figure()
+        plt.title("PDF random evaluated D0->K+pi-pi0")
+        plt.plot(x_np[:, axis], probs_np, '.')
+        plt.xlabel(obs)
+        plt.ylabel("pdf")
     plt.show()
 
 # EOF

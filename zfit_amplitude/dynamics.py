@@ -82,10 +82,13 @@ class RelativisticBreitWignerReal(RelativisticBreitWigner):
 
 
     def __init__(self, obs, name, mres, wres, using_m_squared=False):
-        super().__init__(obs, name, mres, wres, using_m_squared, dtype=zfit.settings.ztypes.float)
+        super().__init__(obs=obs, name=name, mres=mres, wres=wres, using_m_squared=using_m_squared, dtype=zfit.settings.ztypes.float)
 
     def _func(self, x):
-        return ztf.to_real(super()._func(x))
+        propagator = super()._func(x)
+        val = ztf.to_real(propagator * tf.math.conj(propagator))
+        return val
+        #return ztf.to_real(super()._func(x))
 
 
 def blatt_weisskopf_ff(q, q0, d, l):
@@ -187,7 +190,8 @@ class BreitWignerLineshape(zfit.func.BaseFunc):
             return breit_wigner_line_shape(m_sq, m0, gamma0, ma, mb, mc, md, dr, dd, lr, ld,
                                            self.barrier_factor, ma0, md0)
 
-        return ztf.run_no_nan(func=func, x=x)
+        return func(x)
+        # return ztf.run_no_nan(func=func, x=x)
 
 
 def spin_factor_oneplus_swave(pol0, p1, p2, p3, mresa, mresv):
