@@ -72,7 +72,7 @@ class RelativisticBreitWigner(zfit.func.BaseFunc):
         elif self.using_m_squared:
             m_sq = var
         else:
-            m_sq = tf.pow(var, 2)
+            m_sq = var * tf.math.conj(var)
         mres = self.params['mres']
         wres = self.params['wres']
         return relativistic_breit_wigner(m_sq, mres, wres)
@@ -86,7 +86,8 @@ class RelativisticBreitWignerReal(RelativisticBreitWigner):
 
     def _func(self, x):
         propagator = super()._func(x)
-        val = ztf.to_real(propagator * tf.math.conj(propagator))
+        val = propagator * tf.math.conj(propagator)
+        val = ztf.to_real(val)
         return val
         #return ztf.to_real(super()._func(x))
 

@@ -29,12 +29,12 @@ K_PLUS = lp.K_plus
 D_ZERO = lp.D_0
 
 RESONANCES = {
-    # 'rho(770)': ('m2pipi', Resonance(lp.rho_770_plus, dynamics.RelativisticBreitWignerReal)),
-    # 'K2*(1430)0': ('m2kpim', Resonance(Particle.from_string('K(2)*(1430)'), dynamics.RelativisticBreitWignerReal)),
-    # 'K0*(1430)+': ('m2kpi0', Resonance(lp.K_0st_1430_plus,dynamics.RelativisticBreitWignerReal)),
-    'K*(892)+': ('m2kpi0', Resonance(lp.Kst_892_plus, dynamics.RelativisticBreitWignerReal)),
-    # 'K0*(1430)0': ('m2kpim', Resonance(lp.K_0st_1430_0, dynamics.RelativisticBreitWignerReal)),
-    # 'K*(892)0': ('m2kpim', Resonance(lp.Kst_892_0, dynamics.RelativisticBreitWignerReal))
+    'rho(770)': ('m2pipi', Resonance(lp.rho_770_plus, dynamics.RelativisticBreitWigner)),
+    'K2*(1430)0': ('m2kpim', Resonance(Particle.from_string('K(2)*(1430)'), dynamics.RelativisticBreitWigner)),
+    'K0*(1430)+': ('m2kpi0', Resonance(lp.K_0st_1430_plus,dynamics.RelativisticBreitWigner)),
+    'K*(892)+': ('m2kpi0', Resonance(lp.Kst_892_plus, dynamics.RelativisticBreitWigner)),
+    'K0*(1430)0': ('m2kpim', Resonance(lp.K_0st_1430_0, dynamics.RelativisticBreitWigner)),
+    'K*(892)0': ('m2kpim', Resonance(lp.Kst_892_0, dynamics.RelativisticBreitWigner))
 }
 
 COEFFS = {'rho(770)': polar_param('f_rho770', 1.0, 0.0, floating=False),
@@ -102,7 +102,7 @@ if __name__ == "__main__":
 
     zfit.settings.set_verbosity(6)
     # HACK to use default uniform sampling in accept reject
-    # SumAmplitudeSquaredPDF._hack_use_default_sampling = True
+    SumAmplitudeSquaredPDF._hack_use_default_sampling = True
 
     m2kpim = zfit.Space(obs='m2kpim',
                         limits=((K_PLUS.mass + PI_MINUS.mass) ** 2, (D_ZERO.mass - PI_ZERO.mass) ** 2))
@@ -121,24 +121,28 @@ if __name__ == "__main__":
     for dep in pdf.get_dependents(only_floating=False):
         print("{} {} Floating: {}".format(dep.name, zfit.run(dep), dep.floating))
 
-    integral = pdf.integrate(limits=masses)
-    integral = zfit.run(integral)
-    print(f"Integral (should be 1): {integral}")
-    x = ztf.random_uniform(shape=(20000, 3), minval=masses.lower[0], maxval=masses.upper[0])
+    #integral = pdf.integrate(limits=masses)
+    #integral = zfit.run(integral)
+    #print(f"Integral (should be 1): {integral}")
+    x = ztf.random_uniform(shape=(2000, 3), minval=masses.lower[0], maxval=masses.upper[0])
 
-    probs = pdf.pdf(x=x)
-    x_np, probs_np = zfit.run([x, probs])
-    x_np /= (1000 ** 2)
-    sample = pdf.sample(20000)
+    plot_probs = False
+    if plot_probs:
+        probs = pdf.pdf(x=x)
+        x_np, probs_np = zfit.run([x, probs])
+        x_np /= (1000 ** 2)
+    sample = pdf.sample(15000)
     sample_np = zfit.run(sample) / (1000 ** 2)  # from MeV^2 to GeV^2
     for axis1, axis2 in ((0, 1), (1, 2), (2, 0)):
         obs1 = pdf.obs[axis1]
         obs2 = pdf.obs[axis2]
         plt.figure()
         plt.title(f"Dalitz plot D0->K+pi-pi0 of {obs1}:{obs2}")
-        plt.scatter(sample_np[:, axis1], sample_np[:, axis2], s=0.15)
+        # plt.scatter(sample_np[:, axis1], sample_np[:, axis2], s=0.15)
+        plt.hist2d(sample_np[:, axis1], sample_np[:, axis2], bins=100)
         plt.xlabel(f"{obs1} ($GeV^2$)")
         plt.ylabel(f"{obs2} ($GeV^2$)")
+
     for axis in range(3):
         obs = pdf.obs[axis]
         plt.figure()
@@ -147,11 +151,12 @@ if __name__ == "__main__":
         plt.ylabel(f"counts")
         plt.xlabel(f"{obs}")
 
-        plt.figure()
-        plt.title("PDF random evaluated D0->K+pi-pi0")
-        plt.plot(x_np[:, axis], probs_np, '.')
-        plt.xlabel(obs)
-        plt.ylabel("pdf")
+        if plot_probs:
+            plt.figure()
+            plt.title("PDF random evaluated D0->K+pi-pi0")
+            plt.plot(x_np[:, axis], probs_np, '.')
+            plt.xlabel(obs)
+            plt.ylabel("pdf")
     plt.show()
 
 # EOF

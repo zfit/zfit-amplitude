@@ -159,7 +159,7 @@ class HackSampleSumPDF(zfit.pdf.SumPDF):
         # assuming only sum of 2 pdfs
         if len(self.pdfs) > 2 or self.is_extended:
             raise RuntimeError("This is a simple adhoc example, only use with 2 pdfs and non-extended.")
-        n_sample1 = tf.ceil(ztf.to_real(n) * self.fracs[0])
+        n_sample1 = tf.cast(tf.ceil(ztf.to_real(n) * self.fracs[0]), dtype=tf.int64)
         n_sample2 = n - n_sample1
         print("using sampling")
         # HACK to use normal sampling
@@ -298,13 +298,13 @@ if __name__ == "__main__":
     branches_alias = {branch_name: obs_name for branch_name, obs_name in zip(branch_names, obs_names)}
     # sampler = zfit.Data.from_root(path="kpipigamma_rest.root", treepath="DalitzEventList",
     #                              branches_alias=branches_alias)
-
-    #sample_np = zfit.run(sampler)
-    #print("Shape sample produced: {}".format(sample_np.shape))
-    #for i, obs in enumerate(sampler.obs):
-    #    plt.figure()
-    #    plt.title(obs)
-    #    plt.hist(sample_np[:, i], bins=35)
+    sampler.resample()
+    sample_np = zfit.run(sampler)
+    print("Shape sample produced: {}".format(sample_np.shape))
+    for i, obs in enumerate(sampler.obs):
+        plt.figure()
+        plt.title(obs)
+        plt.hist(sample_np[:, i], bins=35)
     # plt.title(sample.obs[1])
     # plt.hist(zfit.run(sample)[:, 1])
     # plt.figure()

@@ -20,6 +20,7 @@ from zfit.core.interfaces import ZfitFunc
 from zfit.models.functions import BaseFunctorFunc
 from zfit.util.execution import SessionHolderMixin
 
+from zfit_amplitude.dynamics import RelativisticBreitWignerReal
 from zfit_amplitude.utils import sanitize_string
 
 
@@ -537,9 +538,10 @@ class Resonance:
             space = zfit.core.sample.EventSpace(f'M({name})',
                                                 limits=(((mass_min,),),
                                                         ((mass_max,),),))
-            return tf.reshape(self._model(obs=space,
-                                          name=f'BW({name})',
-                                          **args).sample(n_events),
+            # bw = self._model(obs=space, name=f'BW({name})', **args).sample(n_events)
+            # HACK below, should use _model "agnosticly"
+            bw = RelativisticBreitWignerReal(obs=space, name=f'BW({name})', **args).sample(n_events)
+            return tf.reshape(bw,
                               (1, n_events))
 
         return get_resonance_mass
