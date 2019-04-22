@@ -248,8 +248,10 @@ class AmplitudeProduct(BaseFunctorFunc, SessionHolderMixin):
     @zfit.supports()
     def _integrate(self, limits, norm_range, name='_integrate'):
         prod_real, prod_imag = self.funcs
-        return ztf.to_real(self.coeff_prod * ztf.complex(prod_real.integrate(limits=limits, norm_range=norm_range),
-                                                         prod_imag.integrate(limits=limits, norm_range=norm_range)))
+        complex_integral = self.coeff_prod * ztf.complex(prod_real.integrate(limits=limits, norm_range=norm_range),
+                                                         prod_imag.integrate(limits=limits, norm_range=norm_range))
+        return complex_integral  # TODO: convert to real already?
+        # return ztf.to_real(complex_integral)
 
 
 # pylint: disable=W0212
@@ -330,8 +332,8 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         # FIXME: We'll be undershooting! We need to normalize to the full integral.
         pseudo_yields = []
         for amp in self._squared_terms:
-            pseudo_yields.append(amp.integrate(limits=limits.get_subspace(amp.obs),
-                                               norm_range=False))
+            pseudo_yields.append(ztf.to_real(amp.integrate(limits=limits.get_subspace(amp.obs),
+                                               norm_range=False)))
         n_to_generate = [tf.math.ceil(ztf.to_real(n_to_produce) * pseudo_yield / tf.reduce_sum(pseudo_yields))
                          for pseudo_yield in pseudo_yields]
 

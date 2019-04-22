@@ -72,7 +72,7 @@ class RelativisticBreitWigner(zfit.func.BaseFunc):
         elif self.using_m_squared:
             m_sq = var
         else:
-            m_sq = var * tf.math.conj(var)
+            m_sq = var * tf.math.conj(var)  # TODO(Albert): this was squared, but should be mult with conj, right?
         mres = self.params['mres']
         wres = self.params['wres']
         return relativistic_breit_wigner(m_sq, mres, wres)
