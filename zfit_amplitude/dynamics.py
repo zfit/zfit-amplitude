@@ -20,14 +20,8 @@ def relativistic_breit_wigner(m2, mres, wres):
     """
     Relativistic Breit-Wigner
     """
-    # TODO: Check complex
     second_part = tf.complex(ztf.constant(0.), mres) * ztf.to_complex(wres)
     below_div = ztf.to_complex(mres ** 2 - m2) - second_part
-    # real_part = tf.real(below_div)
-    # imag_part = tf.imag(below_div)
-    # result = tf.complex(1. / real_part, 1. / imag_part)
-    # return result
-    # return tf.cast(1. / tf.cast(below_div, dtype=tf.complex64), dtype=tf.complex128)
     return 1. / below_div
 
 

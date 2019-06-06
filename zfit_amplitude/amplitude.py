@@ -341,13 +341,13 @@ class SumAmplitudeSquaredPDF(zfit.pdf.BasePDF):
         particles = {}
         for amp_num in range(len(self._squared_terms)):
             print(f"Generating {amp_num}")
-            norm_weight, parts = self._phsp[amp_num].generate(self._top_at_rest, n_to_generate[amp_num])
+            norm_weight, parts = self._phsp[amp_num].generate_tensor(n_to_generate[amp_num])
             norm_weights.append(norm_weight)
             for part_name, gen_parts in parts.items():
                 if part_name not in particles:
                     particles[part_name] = []
                 particles[part_name].append(gen_parts)
-        merged_particles = {part_name: tf.concat(part_list, axis=1)
+        merged_particles = {part_name: tf.concat(part_list, axis=0)
                             for part_name, part_list in particles.items()}
         merged_weights = tf.concat(norm_weights, axis=0)
         thresholds = ztf.random_uniform(shape=tf.shape(merged_weights))
@@ -479,8 +479,8 @@ class Amplitude:
                 part_list.append(part)
             return part_list
 
-        top_name, _, top_tree = self._decay_tree
-        return phsp.Particle(top_name).set_children(*create_particles(top_tree))
+        top_name, top_mass, top_tree = self._decay_tree
+        return phsp.Particle(top_name, top_mass).set_children(*create_particles(top_tree))
 
 
 class Resonance:

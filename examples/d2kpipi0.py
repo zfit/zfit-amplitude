@@ -17,7 +17,7 @@ import zfit
 from zfit import ztf
 
 from zfit_amplitude.amplitude import Decay, Amplitude, Resonance, SumAmplitudeSquaredPDF
-import zfit_amplitude.dynamics as dynamics
+from zfit_amplitude import dynamics
 import zfit_amplitude.kinematics as kinematics
 
 polar_param = zfit.ComplexParameter.from_polar
@@ -94,9 +94,9 @@ class D2Kpipi0Amplitude(Amplitude):
 
 def var_transformation(self, particles):
     """Transform particles to our observables of interest."""
-    return {'m2kpim': kinematics.mass_squared(tf.transpose(particles['K+'] + particles['pi-'])),
-            'm2kpi0': kinematics.mass_squared(tf.transpose(particles['K+'] + particles['pi0'])),
-            'm2pipi': kinematics.mass_squared(tf.transpose(particles['pi-'] + particles['pi0']))}
+    return {'m2kpim': kinematics.mass_squared(particles['K+'] + particles['pi-']),
+            'm2kpi0': kinematics.mass_squared(particles['K+'] + particles['pi0']),
+            'm2pipi': kinematics.mass_squared(particles['pi-'] + particles['pi0'])}
 
 
 if __name__ == "__main__":
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         probs = pdf.pdf(x=x)
         x_np, probs_np = zfit.run([x, probs])
         x_np /= (1000 ** 2)
-    sample = pdf.sample(3009)
+    sample = pdf.sample(30090)
     sample_np = (zfit.run(sample) / (1000 ** 2))  # from MeV^2 to GeV^2
     for axis1, axis2 in ((0, 1), (1, 2), (2, 0)):
         obs1 = pdf.obs[axis1]
