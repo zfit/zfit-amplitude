@@ -11,6 +11,8 @@ zfit-amplitude
 
 zfit amplitude implementation
 
+This repository is fully under development, for prototyping currently.
+
 Usage
 -----
 
